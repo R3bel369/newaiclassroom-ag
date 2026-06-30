@@ -1,0 +1,6 @@
+{
+  "name": "AI Classroom Management System",
+  "description": "A comprehensive classroom administration OS featuring lesson materials, video rooms, assignments, registers, and student analytics utilizing Gemini.",
+  "requestFramePermissions": ["camera", "microphone"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
