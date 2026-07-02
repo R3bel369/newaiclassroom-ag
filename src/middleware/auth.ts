@@ -18,10 +18,13 @@ export const requireAuth = async (
   next: NextFunction
 ) => {
   if (!supabase) {
-    if (!process.env.VITE_SUPABASE_URL || !process.env.VITE_SUPABASE_ANON_KEY) {
-      return res.status(500).json({ error: "Server Configuration Error: Missing VITE_SUPABASE_URL or VITE_SUPABASE_ANON_KEY Environment Variables in Vercel." });
+    const url = process.env.VITE_SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const key = process.env.VITE_SUPABASE_ANON_KEY || process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
+
+    if (!url || !key) {
+      return res.status(500).json({ error: "Server Configuration Error: Missing Supabase Environment Variables in Vercel (Tried VITE_ and NEXT_PUBLIC_ prefixes)." });
     }
-    supabase = createClient(process.env.VITE_SUPABASE_URL, process.env.VITE_SUPABASE_ANON_KEY);
+    supabase = createClient(url, key);
   }
 
   const authHeader = req.headers.authorization;
