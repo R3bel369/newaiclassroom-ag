@@ -16,28 +16,20 @@ import {
 } from './types.ts';
 import MeetingRoom from './components/MeetingRoom.tsx';
 import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip } from 'recharts';
-import { signInWithPopup, GoogleAuthProvider } from 'firebase/auth';
-import { auth, googleAuthProvider } from './lib/firebase.ts';
+import { supabase } from './lib/supabase.ts';
 
-// Intercept all fetch requests to inject demo auth headers dynamically without modifying read-only window.fetch
+// Intercept all fetch requests to inject Supabase auth headers dynamically without modifying read-only window.fetch
 const customFetch = async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
   if (typeof window === 'undefined') {
     return (globalThis as any).fetch(input, init);
   }
-  const role = localStorage.getItem('demo_logged_role') || 'admin';
-  const email = localStorage.getItem('demo_logged_email') || '';
   
   const newInit = { ...init };
   const headers = new Headers(newInit.headers as any);
   
-  const urlStr = typeof input === 'string' ? input : (input && (input as any).url ? (input as any).url : "");
-  if (urlStr.startsWith('/') || urlStr.startsWith('http://localhost') || urlStr.includes(window.location.host)) {
-    if (!headers.has('x-demo-user-role')) {
-      headers.set('x-demo-user-role', role);
-    }
-    if (email && !headers.has('x-demo-user-email')) {
-      headers.set('x-demo-user-email', email);
-    }
+  const { data: { session } } = await supabase.auth.getSession();
+  if (session?.access_token) {
+    headers.set('Authorization', `Bearer ${session.access_token}`);
   }
   
   newInit.headers = headers;
@@ -77,29 +69,35 @@ export default function App() {
   const [loginLoading, setLoginLoading] = useState(false);
   const [loginError, setLoginError] = useState<string | null>(null);
 
+  const getRoleFromEmail = (email: string) => {
+    if (email === 'software3369@gmail.com') return 'teacher';
+    if (email === 'admink338@gmail.com' || email === 'admin@classroom.com') return 'admin';
+    if (email.includes('teacher') || email.includes('taylor')) return 'teacher';
+    if (email.includes('admin')) return 'admin';
+    return 'student';
+  };
+
   const handleDemoLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoginLoading(true);
     setLoginError(null);
     try {
-      const res = await fetch("/api/auth/login", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: loginEmail, password: loginPassword })
+      let { data, error } = await supabase.auth.signInWithPassword({
+        email: loginEmail,
+        password: loginPassword,
       });
-      const data = await res.json();
-      if (!res.ok) {
-        throw new Error(data.error || "Failed to log in");
+      if (error && error.message.toLowerCase().includes("credentials")) {
+        const res = await supabase.auth.signUp({
+          email: loginEmail,
+          password: loginPassword,
+          options: { data: { name: loginEmail.split('@')[0] } }
+        });
+        data = res.data;
+        error = res.error;
       }
-      if (data.user) {
-        localStorage.setItem("demo_logged_in", "true");
-        localStorage.setItem("demo_logged_role", data.user.role);
-        localStorage.setItem("demo_logged_email", data.user.email);
-        
+      if (error) throw error;
+      if (data.session) {
         setIsLoggedIn(true);
-        setActiveRole(data.user.role);
-        setActiveEmail(data.user.email);
-        setCurrentUser(data.user);
         triggerAlert("Logged in successfully!");
       }
     } catch (err: any) {
@@ -109,10 +107,8 @@ export default function App() {
     }
   };
 
-  const handleSignOut = () => {
-    localStorage.removeItem("demo_logged_in");
-    localStorage.removeItem("demo_logged_role");
-    localStorage.removeItem("demo_logged_email");
+  const handleSignOut = async () => {
+    await supabase.auth.signOut();
     setIsLoggedIn(false);
     setCurrentUser(null);
     setActiveEmail("");
@@ -148,6 +144,29 @@ export default function App() {
       localStorage.setItem('theme', 'light');
     }
   }, [darkMode]);
+  
+  useEffect(() => {
+    const handleSession = (session: any) => {
+      if (session) {
+        setIsLoggedIn(true);
+        const email = session.user.email || '';
+        const role = getRoleFromEmail(email);
+        setActiveRole(role as any);
+        setActiveEmail(email);
+        setCurrentUser({ uid: session.user.id, email, role, name: session.user.user_metadata?.name || email.split('@')[0], status: 'active' } as any);
+      } else {
+        setIsLoggedIn(false);
+        setCurrentUser(null);
+      }
+    };
+
+    supabase.auth.getSession().then(({ data: { session } }) => handleSession(session));
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      handleSession(session);
+    });
+    return () => subscription.unsubscribe();
+  }, []);
   
   // Simulated database arrays (hydrated from start-up seed endpoints)
   const [userList, setUserList] = useState<UserProfile[]>([]);

@@ -1,9 +1,11 @@
 // src/middleware/auth.ts
 import { Request, Response, NextFunction } from 'express';
-import { adminAuth } from '../lib/firebase-admin.ts';
+import { createClient } from '@supabase/supabase-js';
 import { db } from '../db/index.ts';
 import { users } from '../db/schema.ts';
 import { eq } from 'drizzle-orm';
+
+let supabase: any;
 
 export interface AuthRequest extends Request {
   user?: any;     // Raw user decoded object
@@ -15,79 +17,8 @@ export const requireAuth = async (
   res: Response,
   next: NextFunction
 ) => {
-  // Check for Demo Header first to simplify local evaluation inside preview frames
-  const demoRole = req.headers['x-demo-user-role'];
-  const demoEmail = req.headers['x-demo-user-email'];
-  
-  if (demoRole) {
-    const roleStr = String(demoRole);
-    const emailStr = demoEmail ? String(demoEmail) : `demo_${roleStr}@classroom.com`;
-    // Find or create demo user in DB
-    try {
-      const existing = await db.select().from(users).where(eq(users.email, emailStr)).limit(1);
-      if (existing.length > 0) {
-        let needsUpdate = false;
-        let correctRole = existing[0].role;
-        let correctName = existing[0].name;
-
-        if (emailStr === "sarah.taylor@classroom.com" && existing[0].role !== "teacher") {
-          correctRole = "teacher";
-          correctName = "Dr. Sarah Taylor";
-          needsUpdate = true;
-        } else if (emailStr === "admin@classroom.com" && existing[0].role !== "admin") {
-          correctRole = "admin";
-          correctName = "Institution Administrator";
-          needsUpdate = true;
-        } else if (emailStr === "emily.johnson@classroom.com" && existing[0].role !== "student") {
-          correctRole = "student";
-          correctName = "Emily Johnson";
-          needsUpdate = true;
-        }
-
-        if (needsUpdate) {
-          const updated = await db.update(users)
-            .set({ role: correctRole, name: correctName })
-            .where(eq(users.id, existing[0].id))
-            .returning();
-          req.dbUser = updated[0];
-        } else {
-          req.dbUser = existing[0];
-        }
-        
-        req.user = { uid: req.dbUser.uid, email: req.dbUser.email, name: req.dbUser.name };
-        return next();
-      } else {
-        // Create demo profile
-        let finalRole = roleStr;
-        let finalName = `${roleStr.charAt(0).toUpperCase() + roleStr.slice(1)} Demo Account`;
-
-        if (emailStr === "sarah.taylor@classroom.com") {
-          finalRole = "teacher";
-          finalName = "Dr. Sarah Taylor";
-        } else if (emailStr === "admin@classroom.com") {
-          finalRole = "admin";
-          finalName = "Institution Administrator";
-        } else if (emailStr === "emily.johnson@classroom.com") {
-          finalRole = "student";
-          finalName = "Emily Johnson";
-        } else if (emailStr === "michael.chang@classroom.com") {
-          finalRole = "student";
-          finalName = "Michael Chang";
-        }
-
-        const inserted = await db.insert(users).values({
-          uid: `demo_uid_${finalRole}_${Date.now()}`,
-          email: emailStr,
-          name: finalName,
-          role: finalRole,
-        }).returning();
-        req.dbUser = inserted[0];
-        req.user = { uid: inserted[0].uid, email: inserted[0].email, name: inserted[0].name };
-        return next();
-      }
-    } catch (err) {
-      console.error("Error setting up demo user:", err);
-    }
+  if (!supabase) {
+    supabase = createClient(process.env.VITE_SUPABASE_URL!, process.env.VITE_SUPABASE_ANON_KEY!);
   }
 
   const authHeader = req.headers.authorization;
@@ -97,11 +28,23 @@ export const requireAuth = async (
 
   const token = authHeader.split('Bearer ')[1];
   try {
-    const decodedToken = await adminAuth.verifyIdToken(token);
-    req.user = decodedToken;
+    // Verify Supabase Token using the Supabase Client (handles ES256/JWKS automatically)
+    const { data: { user }, error } = await supabase.auth.getUser(token);
+    
+    if (error || !user) {
+      console.error('Supabase token verification error:', error);
+      return res.status(401).json({ error: 'Unauthorized: Invalid token' });
+    }
 
+    req.user = user;
+    const uid = user.id;
+    const decodedToken = { 
+      email: user.email, 
+      name: user.user_metadata?.full_name || user.user_metadata?.name 
+    };
+    
     // Search or register the user in the database
-    const userRecords = await db.select().from(users).where(eq(users.uid, decodedToken.uid)).limit(1);
+    const userRecords = await db.select().from(users).where(eq(users.uid, uid)).limit(1);
     
     if (userRecords.length > 0) {
       if (userRecords[0].status === 'suspended') {
@@ -113,15 +56,15 @@ export const requireAuth = async (
       let correctRole = userRecords[0].role;
       let correctName = userRecords[0].name;
 
-      if (decodedToken.email === "sarah.taylor@classroom.com" && userRecords[0].role !== "teacher") {
+      if (decodedToken.email === "software3369@gmail.com" && userRecords[0].role !== "teacher") {
         correctRole = "teacher";
         correctName = "Dr. Sarah Taylor";
         needsUpdate = true;
-      } else if (decodedToken.email === "admin@classroom.com" && userRecords[0].role !== "admin") {
+      } else if (decodedToken.email === "admink338@gmail.com" && userRecords[0].role !== "admin") {
         correctRole = "admin";
         correctName = "Institution Administrator";
         needsUpdate = true;
-      } else if (decodedToken.email === "emily.johnson@classroom.com" && userRecords[0].role !== "student") {
+      } else if (decodedToken.email === "kssg8790@gmail.com" && userRecords[0].role !== "student") {
         correctRole = "student";
         correctName = "Emily Johnson";
         needsUpdate = true;
@@ -140,20 +83,20 @@ export const requireAuth = async (
       // Lazy register
       let defaultRole = 'student';
       let defaultName = decodedToken.name || 'Anonymous Learner';
-      if (decodedToken.email === 'sarah.taylor@classroom.com') {
+      if (decodedToken.email === 'software3369@gmail.com') {
         defaultRole = 'teacher';
         defaultName = 'Dr. Sarah Taylor';
-      } else if (decodedToken.email === 'admin@classroom.com') {
+      } else if (decodedToken.email === 'admink338@gmail.com') {
         defaultRole = 'admin';
         defaultName = 'Institution Administrator';
-      } else if (decodedToken.email === 'emily.johnson@classroom.com') {
+      } else if (decodedToken.email === 'kssg8790@gmail.com') {
         defaultRole = 'student';
         defaultName = 'Emily Johnson';
       }
 
       const inserted = await db.insert(users).values({
-        uid: decodedToken.uid,
-        email: decodedToken.email || `user_${decodedToken.uid.slice(0, 5)}@classroom.com`,
+        uid: uid,
+        email: decodedToken.email || `user_${uid.slice(0, 5)}@classroom.com`,
         name: defaultName,
         role: defaultRole,
       }).returning();
@@ -162,7 +105,7 @@ export const requireAuth = async (
     
     next();
   } catch (error) {
-    console.error('Error verifying Firebase ID token:', error);
+    console.error('Error verifying Supabase token:', error);
     return res.status(401).json({ error: 'Unauthorized: Invalid token' });
   }
 };

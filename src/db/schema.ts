@@ -1,10 +1,10 @@
-import { relations } from 'drizzle-orm';
-import { integer, pgTable, serial, text, timestamp, boolean } from 'drizzle-orm/pg-core';
+import { relations, sql } from 'drizzle-orm';
+import { pgTable, serial, text, integer, boolean, timestamp } from 'drizzle-orm/pg-core';
 
 // Users table (shares Firebase UID as the principal credential link)
 export const users = pgTable('users', {
   id: serial('id').primaryKey(),
-  uid: text('uid').notNull().unique(), // Firebase Auth UID
+  uid: text('uid').notNull().unique(), // Supabase Auth UID
   email: text('email').notNull(),
   name: text('name').notNull(),
   role: text('role').notNull().default('student'), // 'admin' | 'teacher' | 'student'
@@ -57,7 +57,7 @@ export const assignments = pgTable('assignments', {
   title: text('title').notNull(),
   description: text('description').notNull(),
   instructions: text('instructions'),
-  dueDate: timestamp('due_date'),
+  dueDate: text('due_date'),
   maxMarks: integer('max_marks').notNull().default(100),
   type: text('type').notNull().default('homework'), // 'homework' | 'quiz' | 'practice_test' | 'act_test' | 'ap_test' | 'essay' | 'worksheet'
   status: text('status').notNull().default('published'), // 'draft' | 'published' | 'scheduled'
