@@ -23,45 +23,6 @@ import { generateAssignmentAI, gradeSubmissionAI, generateAnalyticsReportAI, gen
 
 export const app = express();
 export default app;
-const PORT = process.env.PORT || 3000;
-
-(async () => {
-  // Run database test on startup and log to file
-  if (process.env.VERCEL === "1") return; // Skip filesystem writes on Vercel
-
-  try {
-    console.log("Running startup database test query...");
-    const testResult = await db.select().from(users).limit(1);
-    fs.writeFileSync("./db_test_status.log", JSON.stringify({
-      status: "success",
-      keys: {
-        SQL_HOST: process.env.SQL_HOST,
-        SQL_USER: process.env.SQL_USER,
-        SQL_PASSWORD: process.env.SQL_PASSWORD ? "SET" : "NOT SET",
-        SQL_DB_NAME: process.env.SQL_DB_NAME,
-      },
-      testResult
-    }, null, 2));
-    console.log("Startup database test query succeeded.");
-  } catch (err: any) {
-    console.error("Startup database test query failed:", err);
-    fs.writeFileSync("./db_test_status.log", JSON.stringify({
-      status: "error",
-      message: err.message,
-      stack: err.stack,
-      cause: err.cause ? {
-        message: err.cause.message,
-        stack: err.cause.stack
-      } : null,
-      keys: {
-        SQL_HOST: process.env.SQL_HOST,
-        SQL_USER: process.env.SQL_USER,
-        SQL_PASSWORD: process.env.SQL_PASSWORD ? "SET" : "NOT SET",
-        SQL_DB_NAME: process.env.SQL_DB_NAME,
-      }
-    }, null, 2));
-  }
-})();
 
   // Standard express body parsers
   app.use(express.json({ limit: "50mb" }));
@@ -1423,25 +1384,4 @@ const PORT = process.env.PORT || 3000;
   }
   })();
 
-  // Vite Middleware Setup
-  if (process.env.VERCEL !== "1") {
-    (async () => {
-      if (process.env.NODE_ENV !== "production") {
-        const vite = await createViteServer({
-          server: { middlewareMode: true },
-          appType: "spa",
-        });
-        app.use(vite.middlewares);
-      } else {
-        const distPath = path.join(process.cwd(), "dist");
-        app.use(express.static(distPath));
-        app.get("*", (req, res) => {
-          res.sendFile(path.join(distPath, "index.html"));
-        });
-      }
-
-      app.listen(PORT, "0.0.0.0", () => {
-        console.log(`Server starting on port ${PORT}`);
-      });
-    })();
-  }
+  // Seeder End
