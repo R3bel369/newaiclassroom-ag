@@ -3341,7 +3341,8 @@ export default function App() {
                               </div>
                             )}
                                         {currentUser?.role === 'student' ? (() => {
-                            const existingSub = activeClassSubmissions.find(sub => sub.assignmentId === selectedAssignment.id && sub.studentId === currentUser?.id);
+                            const actualStudentId = classroomStudents.find(s => s.email === currentUser?.email)?.id || currentUser?.id;
+                            const existingSub = activeClassSubmissions.find(sub => sub.assignmentId === selectedAssignment.id && sub.studentId === actualStudentId);
                             if (existingSub) {
                               return (
                                 <div className="space-y-4 text-left">
