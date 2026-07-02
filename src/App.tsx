@@ -2924,12 +2924,13 @@ export default function App() {
                                       </button>
                                       <a 
                                         href={mat.fileUrl} 
+                                        download
                                         target="_blank" 
                                         rel="noreferrer"
                                         className="text-xs text-indigo-600 font-bold hover:underline flex items-center hover:bg-slate-50 py-1.5 px-3 rounded-md"
                                       >
                                         <span>Download</span>
-                                        <ExternalLink className="w-3.5 h-3.5 ml-1" />
+                                        <Download className="w-3.5 h-3.5 ml-1" />
                                       </a>
                                       {(currentUser?.role === 'teacher' || currentUser?.role === 'admin') && (
                                         <button
@@ -3092,12 +3093,13 @@ export default function App() {
                                               </button>
                                               <a 
                                                 href={mat.fileUrl} 
+                                                download
                                                 target="_blank" 
                                                 rel="noreferrer"
                                                 className="text-xs text-indigo-600 font-bold hover:underline flex items-center hover:bg-slate-50 py-1.5 px-3 rounded-md"
                                               >
                                                 <span>Download</span>
-                                                <ExternalLink className="w-3.5 h-3.5 ml-1" />
+                                                <Download className="w-3.5 h-3.5 ml-1" />
                                               </a>
                                               {(currentUser?.role === 'teacher' || currentUser?.role === 'admin') && (
                                                 <>
@@ -3325,22 +3327,15 @@ export default function App() {
                                   </span>
                                 </div>
                                 <div className="flex items-center space-x-2 shrink-0">
-                                  <button 
-                                    type="button"
-                                    onClick={() => handlePreviewDocument(selectedAssignment.attachmentUrl, selectedAssignment.title)}
-                                    className="text-[10px] font-bold text-indigo-750 bg-indigo-55/10 hover:bg-indigo-55/20 border border-indigo-200/50 py-1.5 px-3 rounded-lg flex items-center space-x-1.5 cursor-pointer transition-all duration-150"
-                                  >
-                                    <Eye className="w-3.5 h-3.5 text-indigo-600" />
-                                    <span>Preview Sheet</span>
-                                  </button>
                                   <a 
                                     href={selectedAssignment.attachmentUrl} 
+                                    download
                                     target="_blank" 
                                     rel="noreferrer" 
                                     className="text-[10px] font-bold text-white bg-indigo-600 hover:bg-indigo-750 py-1.5 px-3 rounded-lg shadow-2xs hover:shadow-xs flex items-center space-x-1 cursor-pointer transition-all duration-150"
                                   >
                                     <span>Download</span>
-                                    <ExternalLink className="w-3.5 h-3.5" />
+                                    <Download className="w-3.5 h-3.5" />
                                   </a>
                                 </div>
                               </div>
@@ -3373,16 +3368,6 @@ export default function App() {
                                           <span className="text-[10.5px] font-bold text-slate-700 truncate max-w-[150px]" title={existingSub.fileUrl.split("/").pop()}>
                                             Submitted file: {existingSub.fileUrl.split("/").pop() || "homework.pdf"}
                                           </span>
-                                        </div>
-                                        <div className="flex items-center space-x-2 shrink-0">
-                                          <button
-                                            type="button"
-                                            onClick={() => handlePreviewDocument(existingSub.fileUrl, `Your Submitted Work`)}
-                                            className="text-[9.5px] font-bold text-indigo-750 bg-indigo-55/10 hover:bg-indigo-55/20 border border-indigo-200/50 px-2.5 py-1 rounded transition cursor-pointer flex items-center gap-1.5"
-                                          >
-                                            <Eye className="w-3 h-3 text-indigo-600" />
-                                            <span>Preview</span>
-                                          </button>
                                         </div>
                                       </div>
                                     )}
@@ -3468,15 +3453,6 @@ export default function App() {
                                         </div>
                                         
                                         <div className="flex items-center justify-center space-x-2.5 pt-1.5 border-t border-slate-200/50">
-                                          <button 
-                                            type="button"
-                                            onClick={() => handlePreviewDocument(studentSubmissionFile, uploadedFileName || "your-homework.pdf")} 
-                                            className="text-[10px] uppercase tracking-wider font-bold text-indigo-600 hover:text-indigo-850 flex items-center space-x-1 cursor-pointer bg-transparent border-0"
-                                          >
-                                            <Eye className="w-3.5 h-3.5 text-indigo-600" />
-                                            <span>Preview File</span>
-                                          </button>
-                                          <span className="text-slate-350 font-light">|</span>
                                           <button 
                                             type="button" 
                                             onClick={() => {
@@ -3591,22 +3567,15 @@ export default function App() {
                                               </span>
                                             </div>
                                             <div className="flex items-center space-x-1.5 shrink-0">
-                                              <button 
-                                                type="button"
-                                                onClick={() => handlePreviewDocument(sub.fileUrl, `Submission: ${student.name}`)}
-                                                className="text-[9.5px] font-bold text-indigo-750 bg-indigo-55/10 hover:bg-indigo-55/20 border border-indigo-200/50 px-2.5 py-1 rounded transition cursor-pointer flex items-center gap-1.5"
-                                              >
-                                                <Eye className="w-3 h-3 text-indigo-600" />
-                                                <span>Preview</span>
-                                              </button>
                                               <a 
                                                 href={sub.fileUrl} 
+                                                download
                                                 target="_blank" 
                                                 rel="noreferrer" 
                                                 className="text-[9.5px] font-bold text-slate-600 hover:text-indigo-600 bg-slate-50 border border-slate-200 px-2.5 py-1 rounded transition flex items-center gap-1 cursor-pointer"
                                               >
-                                                <ExternalLink className="w-3 h-3" />
-                                                <span>Open</span>
+                                                <Download className="w-3 h-3" />
+                                                <span>Download</span>
                                               </a>
                                             </div>
                                           </div>
