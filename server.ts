@@ -21,10 +21,11 @@ import { eq, and, or, inArray, desc, like, sql } from "drizzle-orm";
 import { requireAuth, AuthRequest } from "./src/middleware/auth.ts";
 import { generateAssignmentAI, gradeSubmissionAI, generateAnalyticsReportAI, generateStudyFlashcardsAI } from "./src/lib/gemini.ts";
 
-async function startServer() {
-  const app = express();
-  const PORT = 3000;
+export const app = express();
+export default app;
+const PORT = process.env.PORT || 3000;
 
+(async () => {
   // Run database test on startup and log to file
   try {
     console.log("Running startup database test query...");
@@ -58,6 +59,7 @@ async function startServer() {
       }
     }, null, 2));
   }
+})();
 
   // Standard express body parsers
   app.use(express.json({ limit: "50mb" }));
@@ -1333,8 +1335,9 @@ async function startServer() {
 
 
   // SEEDER: Auto Populate Database with default files on Clean Startup
-  try {
-    const existingUsers = await db.select().from(users).limit(1);
+  (async () => {
+    try {
+      const existingUsers = await db.select().from(users).limit(1);
     if (existingUsers.length === 0) {
       console.log("Empty database detected. Seeding defaults...");
       
@@ -1416,26 +1419,27 @@ async function startServer() {
   } catch (err) {
     console.error("Failed to seed database defaults:", err);
   }
-
+  })();
 
   // Vite Middleware Setup
-  if (process.env.NODE_ENV !== "production") {
-    const vite = await createViteServer({
-      server: { middlewareMode: true },
-      appType: "spa",
-    });
-    app.use(vite.middlewares);
-  } else {
-    const distPath = path.join(process.cwd(), "dist");
-    app.use(express.static(distPath));
-    app.get("*", (req, res) => {
-      res.sendFile(path.join(distPath, "index.html"));
-    });
+  if (process.env.VERCEL !== "1") {
+    (async () => {
+      if (process.env.NODE_ENV !== "production") {
+        const vite = await createViteServer({
+          server: { middlewareMode: true },
+          appType: "spa",
+        });
+        app.use(vite.middlewares);
+      } else {
+        const distPath = path.join(process.cwd(), "dist");
+        app.use(express.static(distPath));
+        app.get("*", (req, res) => {
+          res.sendFile(path.join(distPath, "index.html"));
+        });
+      }
+
+      app.listen(PORT, "0.0.0.0", () => {
+        console.log(`Server starting on port ${PORT}`);
+      });
+    })();
   }
-
-  app.listen(PORT, "0.0.0.0", () => {
-    console.log(`Server starting on port ${PORT}`);
-  });
-}
-
-startServer();
