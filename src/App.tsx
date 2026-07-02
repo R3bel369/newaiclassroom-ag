@@ -7,7 +7,8 @@ import {
   Trash2, Edit, AlertCircle, CheckCircle, Video, Clock, 
   ChevronRight, ArrowRight, Sparkles, Send, Award, FileText, 
   Tv, ClipboardCheck, ArrowUpRight, BarChart3, CloudLightning,
-  ChevronDown, ExternalLink, RefreshCw, Upload, Check, UserMinus, PlusCircle, Copy, ChevronLeft, HelpCircle, RotateCcw, TrendingUp, CalendarRange, Sun, Moon, Lock, NotebookPen, X
+  ChevronDown, ExternalLink, RefreshCw, Upload, Check, UserMinus, PlusCircle, Copy, ChevronLeft, HelpCircle, RotateCcw, TrendingUp, CalendarRange, Sun, Moon, Lock, NotebookPen, X, Trophy, Medal, Download, Eye,
+  Megaphone, MessageSquare, ThumbsUp, Pin, Shuffle, LayoutGrid
 } from 'lucide-react';
 import { 
   UserProfile, Classroom, LearningMaterial, 
@@ -157,7 +158,7 @@ export default function App() {
 
   // Active view states
   const [selectedClass, setSelectedClass] = useState<Classroom | null>(null);
-  const [activeClassTab, setActiveClassTab] = useState<'materials' | 'assignments' | 'meetings' | 'attendance' | 'analytics' | 'student_summary'>('materials');
+  const [activeClassTab, setActiveClassTab] = useState<'materials' | 'assignments' | 'meetings' | 'attendance' | 'analytics' | 'student_summary' | 'board'>('materials');
   const [selectedMeeting, setSelectedMeeting] = useState<Meeting | null>(null); // To launch Zoom room simulator
   
   // Dashboard Metrics
@@ -181,6 +182,21 @@ export default function App() {
   const [showAssignmentModal, setShowAssignmentModal] = useState(false);
   const [newAssignmentData, setNewAssignmentData] = useState({ title: "", description: "", instructions: "", dueDate: "", maxMarks: 100, type: "homework" as any, rubric: "", attachmentUrl: "" });
 
+  // --- INLINE DOCUMENT PREVIEWER ---
+  const [previewPdfUrl, setPreviewPdfUrl] = useState<string | null>(null);
+  const [previewPdfTitle, setPreviewPdfTitle] = useState<string>("");
+
+  const handlePreviewDocument = (url: string | null, title: string) => {
+    if (!url) return;
+    setPreviewPdfUrl(url);
+    setPreviewPdfTitle(title);
+  };
+
+  const handleClosePreview = () => {
+    setPreviewPdfUrl(null);
+    setPreviewPdfTitle("");
+  };
+
   const [showMeetingModal, setShowMeetingModal] = useState(false);
   const [newMeetingData, setNewMeetingData] = useState({ title: "", date: "", time: "", duration: 60, description: "", type: "live_class" });
 
@@ -200,6 +216,107 @@ export default function App() {
 
   // Student Summary selected student filter
   const [selectedStudentIdForSummary, setSelectedStudentIdForSummary] = useState<number | null>(null);
+  const [leaderboardSearch, setLeaderboardSearch] = useState("");
+  const [leaderboardSortBy, setLeaderboardSortBy] = useState<'grade' | 'rate' | 'name'>('grade');
+
+  // --- CUSTOM EXCELLENT NON-AI FEATURES: NOTICE BOARD & DISCUSSION HUBS ---
+  const [classNoticePosts, setClassNoticePosts] = useState<any[]>(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('class_notice_posts');
+      if (saved) {
+        try {
+          return JSON.parse(saved);
+        } catch (e) {
+          // Fallback
+        }
+      }
+    }
+    // Seed initial notices
+    return [
+      {
+        id: 1,
+        classId: 1, // Adapts dynamically
+        title: "📌 Important: Semester Syllabus & Diagnostic Assessment Prep",
+        content: "Welcome everyone! Please make sure to download the Punctuation Handbook from the Learning Units tab. We will be discussing chapters 1 to 3 in our live conference this Thursday. Ensure your workspace is ready and you've submitted your practice worksheet draft.",
+        category: "important",
+        pinned: true,
+        authorName: "Sarah Taylor (Instructor)",
+        createdAt: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString(),
+        upvotes: 4,
+        upvotedBy: [],
+        comments: [
+          {
+            id: 101,
+            authorName: "Emily Johnson",
+            content: "Should we complete the exercises at the end of Chapter 2, or just read through them?",
+            createdAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
+            isAnswer: false
+          },
+          {
+            id: 102,
+            authorName: "Sarah Taylor (Instructor)",
+            content: "Please attempt the first 5 questions of Chapter 2. We'll review them live in class!",
+            createdAt: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString(),
+            isAnswer: true
+          }
+        ]
+      },
+      {
+        id: 2,
+        classId: 1,
+        title: "📝 Homework Assignment 1: Grammar Rhetoric Guide",
+        content: "Seniors, the Rhetoric and Grammar Checkpoint assignment has been published. Please ensure your submission is typed in the workspace text editor or uploaded as a PDF. Remember to consult the Rubrics listed on the assignments panel before saving final draft.",
+        category: "homework",
+        pinned: false,
+        authorName: "Sarah Taylor (Instructor)",
+        createdAt: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString(),
+        upvotes: 2,
+        upvotedBy: [],
+        comments: []
+      }
+    ];
+  });
+
+  const [noticeSearchQuery, setNoticeSearchQuery] = useState("");
+  const [newNoticeData, setNewNoticeData] = useState({ title: "", content: "", category: "general" });
+  const [showNewNoticeForm, setShowNewNoticeForm] = useState(false);
+  const [noticeReplyTexts, setNoticeReplyTexts] = useState<Record<number, string>>({});
+
+  // Persist notices
+  useEffect(() => {
+    localStorage.setItem('class_notice_posts', JSON.stringify(classNoticePosts));
+  }, [classNoticePosts]);
+
+  // Seating configuration & Smart Roster Group maker
+  const [classSeating, setClassSeating] = useState<Record<string, { row: number, col: number }>>(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('class_seating_charts');
+      if (saved) {
+        try { return JSON.parse(saved); } catch (e) {}
+      }
+    }
+    return {};
+  });
+
+  const [classGroups, setClassGroups] = useState<any[]>(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('class_generated_groups');
+      if (saved) {
+        try { return JSON.parse(saved); } catch (e) {}
+      }
+    }
+    return [];
+  });
+
+  const [groupSizeInput, setGroupSizeInput] = useState(3);
+
+  useEffect(() => {
+    localStorage.setItem('class_seating_charts', JSON.stringify(classSeating));
+  }, [classSeating]);
+
+  useEffect(() => {
+    localStorage.setItem('class_generated_groups', JSON.stringify(classGroups));
+  }, [classGroups]);
 
   // Dynamic Folder Explorer states
   const [currentFolderPath, setCurrentFolderPath] = useState<string[]>([]);
@@ -684,6 +801,190 @@ export default function App() {
       setTeacherNotesList([]);
     }
   }, [activeClassTab, selectedClass, selectedStudentIdForSummary, classroomStudents, currentUser, activeRole]);
+
+  // --- NOTICE BOARD FUNCTIONS ---
+  const handleAddNotice = () => {
+    if (!newNoticeData.title.trim() || !newNoticeData.content.trim() || !selectedClass) return;
+    const newNotice = {
+      id: Date.now(),
+      classId: selectedClass.id,
+      title: newNoticeData.title,
+      content: newNoticeData.content,
+      category: newNoticeData.category,
+      pinned: false,
+      authorName: currentUser?.name || "Educator",
+      createdAt: new Date().toISOString(),
+      upvotes: 0,
+      upvotedBy: [],
+      comments: []
+    };
+    setClassNoticePosts(prev => [newNotice, ...prev]);
+    setNewNoticeData({ title: "", content: "", category: "general" });
+    setShowNewNoticeForm(false);
+    triggerAlert("Announcement posted on Notice Board!", "ok");
+  };
+
+  const handleDeleteNotice = (id: number) => {
+    setClassNoticePosts(prev => prev.filter(post => post.id !== id));
+    triggerAlert("Announcement deleted.", "ok");
+  };
+
+  const handleTogglePinNotice = (id: number) => {
+    setClassNoticePosts(prev => prev.map(post => {
+      if (post.id === id) {
+        return { ...post, pinned: !post.pinned };
+      }
+      return post;
+    }));
+  };
+
+  const handleUpvoteNotice = (id: number) => {
+    if (!currentUser) return;
+    setClassNoticePosts(prev => prev.map(post => {
+      if (post.id === id) {
+        const upvoted = post.upvotedBy || [];
+        const index = upvoted.indexOf(currentUser.id);
+        if (index > -1) {
+          // Downvote/remove
+          const updated = [...upvoted];
+          updated.splice(index, 1);
+          return { ...post, upvotes: Math.max(0, post.upvotes - 1), upvotedBy: updated };
+        } else {
+          // Upvote
+          return { ...post, upvotes: post.upvotes + 1, upvotedBy: [...upvoted, currentUser.id] };
+        }
+      }
+      return post;
+    }));
+  };
+
+  const handleAddNoticeComment = (noticeId: number) => {
+    const text = noticeReplyTexts[noticeId]?.trim();
+    if (!text || !currentUser) return;
+
+    setClassNoticePosts(prev => prev.map(post => {
+      if (post.id === noticeId) {
+        const newComment = {
+          id: Date.now(),
+          authorName: currentUser.name,
+          content: text,
+          createdAt: new Date().toISOString(),
+          isAnswer: false
+        };
+        return { ...post, comments: [...(post.comments || []), newComment] };
+      }
+      return post;
+    }));
+
+    setNoticeReplyTexts(prev => ({ ...prev, [noticeId]: "" }));
+    triggerAlert("Response posted.", "ok");
+  };
+
+  const handleToggleCommentAnswer = (noticeId: number, commentId: number) => {
+    if (activeRole === 'student') return; // only teachers can verify
+    setClassNoticePosts(prev => prev.map(post => {
+      if (post.id === noticeId) {
+        const updatedComments = (post.comments || []).map((c: any) => {
+          if (c.id === commentId) {
+            return { ...c, isAnswer: !c.isAnswer };
+          }
+          return c;
+        });
+        return { ...post, comments: updatedComments };
+      }
+      return post;
+    }));
+  };
+
+  // --- SEATING CHART & SMART GROUP MAKER FUNCTIONS ---
+  const handleAssignSeat = (studentId: string | number, row: number, col: number) => {
+    setClassSeating(prev => ({
+      ...prev,
+      [`${selectedClass?.id || 1}_${studentId}`]: { row, col }
+    }));
+  };
+
+  const handleClearSeating = () => {
+    if (!selectedClass) return;
+    const prefix = `${selectedClass.id}_`;
+    setClassSeating(prev => {
+      const copy = { ...prev };
+      Object.keys(copy).forEach(key => {
+        if (key.startsWith(prefix)) {
+          delete copy[key];
+        }
+      });
+      return copy;
+    });
+    triggerAlert("Seating layout reset.", "ok");
+  };
+
+  const handleAutoAssignSeating = () => {
+    if (!selectedClass || classroomStudents.length === 0) return;
+    const prefix = `${selectedClass.id}_`;
+    const rows = 4;
+    const cols = 5;
+    const updatedSeating: Record<string, { row: number, col: number }> = {};
+
+    classroomStudents.forEach((student, index) => {
+      const row = Math.floor(index / cols);
+      const col = index % cols;
+      if (row < rows) {
+        updatedSeating[`${prefix}${student.id}`] = { row, col };
+      }
+    });
+
+    setClassSeating(prev => {
+      const copy = { ...prev };
+      // Clear first
+      Object.keys(copy).forEach(key => {
+        if (key.startsWith(prefix)) delete copy[key];
+      });
+      // Set new
+      return { ...copy, ...updatedSeating };
+    });
+    triggerAlert("Students assigned seats sequentially in Grid.", "ok");
+  };
+
+  const handleGenerateGroups = (size: number) => {
+    if (!selectedClass || classroomStudents.length === 0) return;
+    if (size < 2) size = 2;
+    
+    // Sort students by average grade for grade-balanced groups if grades exist
+    const totalAsgs = activeClassAssignments?.length || 0;
+    const studentsWithPerf = classroomStudents.map(student => {
+      const studentSubmissions = activeClassSubmissions.filter(sub => sub.studentId === student.id);
+      const gradedSubs = studentSubmissions.filter(sub => sub.status === 'graded' && sub.grade);
+      const gradesArray = gradedSubs.map(sub => parseFloat(sub.grade)).filter(g => !isNaN(g));
+      const avgGrade = gradesArray.length > 0
+        ? gradesArray.reduce((acc, curr) => acc + curr, 0) / gradesArray.length
+        : 75; // fallback
+      return { student, avgGrade };
+    });
+
+    // Smart team distribution round-robin
+    studentsWithPerf.sort((a, b) => b.avgGrade - a.avgGrade);
+    
+    const numGroups = Math.ceil(classroomStudents.length / size);
+    const groups: any[] = Array.from({ length: numGroups }, (_, i) => ({
+      id: i + 1,
+      name: `Study Group ${String.fromCharCode(65 + i)}`,
+      members: []
+    }));
+
+    studentsWithPerf.forEach((item, index) => {
+      const groupIdx = index % numGroups;
+      groups[groupIdx].members.push(item.student);
+    });
+
+    setClassGroups(groups);
+    triggerAlert(`Smart Team Maker: Generated ${numGroups} grade-balanced study teams!`, "ok");
+  };
+
+  const handleClearGroups = () => {
+    setClassGroups([]);
+    triggerAlert("Study groups cleared.", "ok");
+  };
 
   const handleGlobalSearch = async () => {
     if (!globalSearchQuery.trim()) {
@@ -2159,6 +2460,7 @@ export default function App() {
                 { key: 'assignments', label: 'Assignments', icon: FileText },
                 { key: 'meetings', label: 'Live Conferences', icon: Video },
                 { key: 'attendance', label: 'Student Registers', icon: ClipboardCheck },
+                { key: 'board', label: 'Class Notice Board', icon: Megaphone },
                 { key: 'analytics', label: 'Copilot Analytics', icon: BarChart3 },
                 { key: 'student_summary', label: 'Student Summary', icon: TrendingUp },
               ].map(tab => {
@@ -2797,166 +3099,236 @@ export default function App() {
                                   <div className="p-1 px-1.5 bg-indigo-50 text-indigo-600 rounded">
                                     <FileText className="w-4 h-4 shrink-0" />
                                   </div>
-                                  <span className="text-[11px] font-bold text-slate-750 truncate max-w-[170px]" title={selectedAssignment.attachmentUrl.split("/").pop()}>
+                                  <span className="text-[11px] font-bold text-slate-750 truncate max-w-[150px]" title={selectedAssignment.attachmentUrl.split("/").pop()}>
                                     Reference file: {selectedAssignment.attachmentUrl.split("/").pop() || "Attached Worksheet"}
                                   </span>
                                 </div>
-                                <a 
-                                  href={selectedAssignment.attachmentUrl} 
-                                  target="_blank" 
-                                  rel="noreferrer" 
-                                  className="text-[10px] font-bold text-white bg-indigo-600 hover:bg-indigo-750 py-1.5 px-3 rounded-lg shadow-2xs hover:shadow-xs shrink-0 flex items-center space-x-1 cursor-pointer transition-all duration-150"
-                                >
-                                  <span>Download Sheet</span>
-                                  <ExternalLink className="w-3.5 h-3.5" />
-                                </a>
+                                <div className="flex items-center space-x-2 shrink-0">
+                                  <button 
+                                    type="button"
+                                    onClick={() => handlePreviewDocument(selectedAssignment.attachmentUrl, selectedAssignment.title)}
+                                    className="text-[10px] font-bold text-indigo-750 bg-indigo-55/10 hover:bg-indigo-55/20 border border-indigo-200/50 py-1.5 px-3 rounded-lg flex items-center space-x-1.5 cursor-pointer transition-all duration-150"
+                                  >
+                                    <Eye className="w-3.5 h-3.5 text-indigo-600" />
+                                    <span>Preview Sheet</span>
+                                  </button>
+                                  <a 
+                                    href={selectedAssignment.attachmentUrl} 
+                                    target="_blank" 
+                                    rel="noreferrer" 
+                                    className="text-[10px] font-bold text-white bg-indigo-600 hover:bg-indigo-750 py-1.5 px-3 rounded-lg shadow-2xs hover:shadow-xs flex items-center space-x-1 cursor-pointer transition-all duration-150"
+                                  >
+                                    <span>Download</span>
+                                    <ExternalLink className="w-3.5 h-3.5" />
+                                  </a>
+                                </div>
                               </div>
                             )}
-                          </div>
-
-                          {currentUser?.role === 'student' ? (
-                            /* STUDENT PANEL: SUBMIT HOMEWORK */
-                            <form onSubmit={submitAssignmentWork} className="space-y-4">
-                              <div>
-                                <div className="flex justify-between items-center mb-1.5">
-                                  <label className="text-[10px] text-slate-450 font-bold uppercase tracking-wider block">Your Submission Contents (Write or copy/paste response)</label>
-                                  {draftSavedStatus && (
-                                    <span className="text-[9px] font-mono font-bold text-emerald-600 bg-emerald-50 border border-emerald-150/50 rounded px-1.5 py-0.5 flex items-center space-x-1 animate-pulse">
-                                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-ping absolute" />
-                                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 relative" />
-                                      <span>{draftSavedStatus}</span>
-                                    </span>
-                                  )}
-                                </div>
-                                <textarea 
-                                  rows={5}
-                                  placeholder="Begin typing your assignment solutions here..."
-                                  value={studentSubmissionText}
-                                  onChange={(e) => setStudentSubmissionText(e.target.value)}
-                                  className="w-full bg-slate-50 border border-slate-200 rounded-md text-xs p-3.5 outline-hidden focus:border-indigo-500 placeholder:text-slate-400 text-slate-800"
-                                  required
-                                />
-                              </div>
-
-                              <div>
-                                <label className="text-[10px] text-slate-450 font-bold uppercase tracking-wider block mb-1">Supporting Homework Documents (PDF, Doc, Image, Spreadsheet)</label>
-                                
-                                <div 
-                                  onDragOver={(e) => {
-                                    e.preventDefault();
-                                    setIsDragging(true);
-                                  }}
-                                  onDragLeave={() => setIsDragging(false)}
-                                  onDrop={(e) => {
-                                    e.preventDefault();
-                                    setIsDragging(false);
-                                    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
-                                      handleFileUpload(e.dataTransfer.files[0]);
-                                    }
-                                  }}
-                                  className={`border-2 border-dashed rounded-xl p-6 text-center transition-all duration-200 mt-1 relative overflow-hidden ${isDragging ? 'border-indigo-650 bg-indigo-50/70 shadow-xs' : 'border-slate-200 bg-slate-50 hover:bg-slate-100/50 hover:border-slate-300'}`}
-                                >
-                                  {isUploading ? (
-                                    <div className="flex flex-col items-center justify-center py-2 space-y-2.5">
-                                      <RefreshCw className="w-8 h-8 text-indigo-600 animate-spin" />
-                                      <span className="text-[11px] font-bold text-slate-550 font-mono tracking-tight">Uploading work file, please hold...</span>
+                                        {currentUser?.role === 'student' ? (() => {
+                            const existingSub = activeClassSubmissions.find(sub => sub.assignmentId === selectedAssignment.id && sub.studentId === currentUser?.id);
+                            if (existingSub) {
+                              return (
+                                <div className="space-y-4 text-left">
+                                  <div className="bg-emerald-50/20 border border-emerald-200 rounded-xl p-4 space-y-3">
+                                    <div className="flex justify-between items-center border-b border-emerald-100/60 pb-2">
+                                      <span className="text-[10px] font-bold text-emerald-700 uppercase tracking-wider block">✓ Assignment Handed In</span>
+                                      <span className="text-[10px] text-slate-400 font-mono">
+                                        {existingSub.submittedAt ? new Date(existingSub.submittedAt).toLocaleDateString() : ""}
+                                      </span>
                                     </div>
-                                  ) : studentSubmissionFile ? (
-                                    <div className="space-y-4">
-                                      <div className="flex items-center justify-center space-x-2.5">
-                                        <div className="p-2.5 bg-emerald-50 text-emerald-600 rounded-lg shrink-0">
-                                          <FileText className="w-6 h-6 animate-bounce" />
+                                    <div className="space-y-1">
+                                      <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest font-mono block">Your Response text</span>
+                                      <div className="bg-white border border-slate-150 p-3 rounded-md text-xs text-slate-755 leading-relaxed max-h-40 overflow-y-auto whitespace-pre-wrap">
+                                        {existingSub.textContent || <span className="text-slate-400 italic font-medium">No text content submitted.</span>}
+                                      </div>
+                                    </div>
+
+                                    {existingSub.fileUrl && (
+                                      <div className="bg-white border border-slate-150 rounded-lg p-2.5 flex items-center justify-between gap-3">
+                                        <div className="flex items-center space-x-2 min-w-0">
+                                          <div className="p-1 bg-indigo-50/60 text-indigo-600 rounded">
+                                            <FileText className="w-3.5 h-3.5" />
+                                          </div>
+                                          <span className="text-[10.5px] font-bold text-slate-700 truncate max-w-[150px]" title={existingSub.fileUrl.split("/").pop()}>
+                                            Submitted file: {existingSub.fileUrl.split("/").pop() || "homework.pdf"}
+                                          </span>
                                         </div>
-                                        <div className="text-left min-w-0">
-                                          <p className="text-xs font-bold text-slate-800 truncate max-w-[200px]" title={uploadedFileName || "your-homework.pdf"}>
-                                            {uploadedFileName || "Uploaded Document"}
-                                          </p>
-                                          <p className="text-[9.5px] font-mono text-slate-450 truncate max-w-[200px]">{studentSubmissionFile}</p>
+                                        <div className="flex items-center space-x-2 shrink-0">
+                                          <button
+                                            type="button"
+                                            onClick={() => handlePreviewDocument(existingSub.fileUrl, `Your Submitted Work`)}
+                                            className="text-[9.5px] font-bold text-indigo-750 bg-indigo-55/10 hover:bg-indigo-55/20 border border-indigo-200/50 px-2.5 py-1 rounded transition cursor-pointer flex items-center gap-1.5"
+                                          >
+                                            <Eye className="w-3 h-3 text-indigo-600" />
+                                            <span>Preview</span>
+                                          </button>
                                         </div>
                                       </div>
-                                      
-                                      <div className="flex items-center justify-center space-x-2.5 pt-1.5 border-t border-slate-200/50">
-                                        <a 
-                                          href={studentSubmissionFile} 
-                                          target="_blank" 
-                                          rel="noreferrer" 
-                                          className="text-[10px] uppercase tracking-wider font-bold text-indigo-600 hover:text-indigo-800 flex items-center space-x-1 cursor-pointer"
-                                        >
-                                          <span>View File</span>
-                                          <ExternalLink className="w-3 h-3" />
-                                        </a>
-                                        <span className="text-slate-350 font-light">|</span>
-                                        <button 
-                                          type="button" 
-                                          onClick={() => {
-                                            setStudentSubmissionFile("");
-                                            setUploadedFileName("");
-                                          }} 
-                                          className="text-[10px] uppercase tracking-wider font-bold text-red-500 hover:text-red-700 flex items-center space-x-1 cursor-pointer"
-                                        >
-                                          <Trash2 className="w-3 h-3" />
-                                          <span>Delete</span>
-                                        </button>
-                                      </div>
-                                    </div>
-                                  ) : (
-                                    <div className="flex flex-col items-center space-y-2 py-1">
-                                      <div className="p-3 bg-white border border-slate-150 rounded-full shadow-2xs text-indigo-600">
-                                        <Upload className="w-5 h-5" />
-                                      </div>
-                                      <div>
-                                        <p className="text-xs font-bold text-slate-700">Drag & drop your homework attachment</p>
-                                        <p className="text-[10px] text-slate-450 mt-0.5 font-medium">Valid files: PDFs, Office sheets, images, and texts</p>
-                                      </div>
-                                      <label className="text-[10.5px] font-bold bg-white text-indigo-650 hover:bg-slate-50 border border-slate-200 py-1.5 px-3.5 rounded-lg shadow-2xs cursor-pointer active:scale-95 transition-all duration-150 inline-block mt-1">
-                                        <span>Select Work File</span>
-                                        <input 
-                                          type="file" 
-                                          className="hidden" 
-                                          onChange={(e) => {
-                                            if (e.target.files && e.target.files[0]) {
-                                              handleFileUpload(e.target.files[0]);
-                                            }
-                                          }} 
-                                        />
-                                      </label>
-                                    </div>
-                                  )}
-                                  {uploadError && (
-                                    <div className="text-[10px] text-red-650 font-bold mt-2.5 flex items-center justify-center space-x-1 bg-red-50 border border-red-150 p-2 rounded-lg">
-                                      <AlertCircle className="w-3.5 h-3.5 shrink-0 text-red-500" />
-                                      <span className="truncate max-w-[240px]">{uploadError}</span>
-                                    </div>
-                                  )}
-                                </div>
+                                    )}
 
-                                <div className="mt-3">
-                                  <span className="text-[10px] font-bold text-slate-450 uppercase tracking-wider block mb-1">Or paste custom resource URL directly</span>
-                                  <input 
-                                    type="text" 
-                                    placeholder="e.g. https://drive.google.com/file/d/your-homework-doc"
-                                    value={studentSubmissionFile}
-                                    onChange={(e) => {
-                                      setStudentSubmissionFile(e.target.value);
-                                      if (e.target.value) {
-                                        setUploadedFileName(e.target.value.split("/").pop() || "Custom Link");
-                                      } else {
-                                        setUploadedFileName("");
-                                      }
-                                    }}
-                                    className="w-full bg-slate-50 border border-slate-200 rounded-md text-xs p-2.5 outline-hidden focus:border-indigo-500 placeholder:text-slate-450 text-slate-800"
+                                    {existingSub.status === 'graded' ? (
+                                      <div className="bg-indigo-50/60 border border-indigo-150 rounded-lg p-3 mt-2 space-y-1">
+                                        <div className="flex justify-between text-xs font-bold text-slate-800">
+                                          <span>Graded Evaluation:</span>
+                                          <span className="text-indigo-700 font-extrabold">{existingSub.grade} Marks</span>
+                                        </div>
+                                        <p className="text-[11px] text-slate-600 leading-relaxed italic">
+                                          "{existingSub.feedback || "No feedback left."}"
+                                        </p>
+                                      </div>
+                                    ) : (
+                                      <div className="bg-slate-50/80 border border-slate-200 rounded-lg p-3 mt-2 text-center text-slate-500 text-[10px] font-bold uppercase tracking-wider">
+                                        ⏳ Pending Teacher Evaluation
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
+                              );
+                            }
+
+                            return (
+                              <form onSubmit={submitAssignmentWork} className="space-y-4">
+                                <div>
+                                  <div className="flex justify-between items-center mb-1.5">
+                                    <label className="text-[10px] text-slate-450 font-bold uppercase tracking-wider block">Your Submission Contents (Write or copy/paste response)</label>
+                                    {draftSavedStatus && (
+                                      <span className="text-[9px] font-mono font-bold text-emerald-600 bg-emerald-50 border border-emerald-150/50 rounded px-1.5 py-0.5 flex items-center space-x-1 animate-pulse">
+                                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-ping absolute" />
+                                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 relative" />
+                                        <span>{draftSavedStatus}</span>
+                                      </span>
+                                    )}
+                                  </div>
+                                  <textarea 
+                                    rows={5}
+                                    placeholder="Begin typing your assignment solutions here..."
+                                    value={studentSubmissionText}
+                                    onChange={(e) => setStudentSubmissionText(e.target.value)}
+                                    className="w-full bg-slate-50 border border-slate-200 rounded-md text-xs p-3.5 outline-hidden focus:border-indigo-500 placeholder:text-slate-400 text-slate-800"
+                                    required
                                   />
                                 </div>
-                              </div>
 
-                              <button 
-                                type="submit" 
-                                className="w-full bg-indigo-600 hover:bg-indigo-705 text-white font-semibold text-xs py-2.5 rounded-md transition shadow-md active:scale-95"
-                              >
-                                Upload & Hand in homework
-                              </button>
-                            </form>
-                          ) : (
+                                <div>
+                                  <label className="text-[10px] text-slate-450 font-bold uppercase tracking-wider block mb-1">Supporting Homework Documents (PDF, Doc, Image, Spreadsheet)</label>
+                                  
+                                  <div 
+                                    onDragOver={(e) => {
+                                      e.preventDefault();
+                                      setIsDragging(true);
+                                    }}
+                                    onDragLeave={() => setIsDragging(false)}
+                                    onDrop={(e) => {
+                                      e.preventDefault();
+                                      setIsDragging(false);
+                                      if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+                                        handleFileUpload(e.dataTransfer.files[0]);
+                                      }
+                                    }}
+                                    className={`border-2 border-dashed rounded-xl p-6 text-center transition-all duration-200 mt-1 relative overflow-hidden ${isDragging ? 'border-indigo-650 bg-indigo-50/70 shadow-xs' : 'border-slate-200 bg-slate-50 hover:bg-slate-100/50 hover:border-slate-300'}`}
+                                  >
+                                    {isUploading ? (
+                                      <div className="flex flex-col items-center justify-center py-2 space-y-2.5">
+                                        <RefreshCw className="w-8 h-8 text-indigo-600 animate-spin" />
+                                        <span className="text-[11px] font-bold text-slate-550 font-mono tracking-tight">Uploading work file, please hold...</span>
+                                      </div>
+                                    ) : studentSubmissionFile ? (
+                                      <div className="space-y-4">
+                                        <div className="flex items-center justify-center space-x-2.5">
+                                          <div className="p-2.5 bg-emerald-50 text-emerald-600 rounded-lg shrink-0">
+                                            <FileText className="w-6 h-6 animate-bounce" />
+                                          </div>
+                                          <div className="text-left min-w-0">
+                                            <p className="text-xs font-bold text-slate-800 truncate max-w-[200px]" title={uploadedFileName || "your-homework.pdf"}>
+                                              {uploadedFileName || "Uploaded Document"}
+                                            </p>
+                                            <p className="text-[9.5px] font-mono text-slate-450 truncate max-w-[200px]">{studentSubmissionFile}</p>
+                                          </div>
+                                        </div>
+                                        
+                                        <div className="flex items-center justify-center space-x-2.5 pt-1.5 border-t border-slate-200/50">
+                                          <button 
+                                            type="button"
+                                            onClick={() => handlePreviewDocument(studentSubmissionFile, uploadedFileName || "your-homework.pdf")} 
+                                            className="text-[10px] uppercase tracking-wider font-bold text-indigo-600 hover:text-indigo-850 flex items-center space-x-1 cursor-pointer bg-transparent border-0"
+                                          >
+                                            <Eye className="w-3.5 h-3.5 text-indigo-600" />
+                                            <span>Preview File</span>
+                                          </button>
+                                          <span className="text-slate-350 font-light">|</span>
+                                          <button 
+                                            type="button" 
+                                            onClick={() => {
+                                              setStudentSubmissionFile("");
+                                              setUploadedFileName("");
+                                            }} 
+                                            className="text-[10px] uppercase tracking-wider font-bold text-red-500 hover:text-red-700 flex items-center space-x-1 cursor-pointer bg-transparent border-0"
+                                          >
+                                            <Trash2 className="w-3 h-3" />
+                                            <span>Delete</span>
+                                          </button>
+                                        </div>
+                                      </div>
+                                    ) : (
+                                      <div className="flex flex-col items-center space-y-2 py-1">
+                                        <div className="p-3 bg-white border border-slate-150 rounded-full shadow-2xs text-indigo-600">
+                                          <Upload className="w-5 h-5" />
+                                        </div>
+                                        <div>
+                                          <p className="text-xs font-bold text-slate-700">Drag & drop your homework attachment</p>
+                                          <p className="text-[10px] text-slate-450 mt-0.5 font-medium">Valid files: PDFs, Office sheets, images, and texts</p>
+                                        </div>
+                                        <label className="text-[10.5px] font-bold bg-white text-indigo-650 hover:bg-slate-50 border border-slate-200 py-1.5 px-3.5 rounded-lg shadow-2xs cursor-pointer active:scale-95 transition-all duration-150 inline-block mt-1">
+                                          <span>Select Work File</span>
+                                          <input 
+                                            type="file" 
+                                            className="hidden" 
+                                            onChange={(e) => {
+                                              if (e.target.files && e.target.files[0]) {
+                                                handleFileUpload(e.target.files[0]);
+                                              }
+                                            }} 
+                                          />
+                                        </label>
+                                      </div>
+                                    )}
+                                    {uploadError && (
+                                      <div className="text-[10px] text-red-650 font-bold mt-2.5 flex items-center justify-center space-x-1 bg-red-50 border border-red-150 p-2 rounded-lg">
+                                        <AlertCircle className="w-3.5 h-3.5 shrink-0 text-red-500" />
+                                        <span className="truncate max-w-[240px]">{uploadError}</span>
+                                      </div>
+                                    )}
+                                  </div>
+
+                                  <div className="mt-3">
+                                    <span className="text-[10px] font-bold text-slate-450 uppercase tracking-wider block mb-1">Or paste custom resource URL directly</span>
+                                    <input 
+                                      type="text" 
+                                      placeholder="e.g. https://drive.google.com/file/d/your-homework-doc"
+                                      value={studentSubmissionFile}
+                                      onChange={(e) => {
+                                        setStudentSubmissionFile(e.target.value);
+                                        if (e.target.value) {
+                                          setUploadedFileName(e.target.value.split("/").pop() || "Custom Link");
+                                        } else {
+                                          setUploadedFileName("");
+                                        }
+                                      }}
+                                      className="w-full bg-slate-50 border border-slate-200 rounded-md text-xs p-2.5 outline-hidden focus:border-indigo-500 placeholder:text-slate-450 text-slate-800"
+                                    />
+                                  </div>
+                                </div>
+
+                                <button 
+                                  type="submit" 
+                                  className="w-full bg-indigo-600 hover:bg-indigo-705 text-white font-semibold text-xs py-2.5 rounded-md transition shadow-md active:scale-95 cursor-pointer"
+                                >
+                                  Upload & Hand in homework
+                                </button>
+                              </form>
+                            );
+                          })()
+                          : (
                             /* TEACHER PANEL: REVIEW SUBMISSIONS */
                             <div className="space-y-4">
                               <h4 className="font-bold text-xs text-slate-500 uppercase tracking-wider border-b border-slate-100 pb-1.5">Student Answer papers hand-in</h4>
@@ -2972,7 +3344,7 @@ export default function App() {
                                     const isGradingSuggestionLoading = aiGradePending === sub.id;
 
                                     return (
-                                      <div key={`${sub.id}-${idx}`} className="p-3.5 bg-slate-50 border border-slate-200 rounded-lg text-xs space-y-3">
+                                      <div key={`${sub.id}-${idx}`} className="p-3.5 bg-slate-50 border border-slate-200 rounded-lg text-xs space-y-3 text-left">
                                         <div className="flex justify-between items-center">
                                           <div>
                                             <span className="font-bold text-slate-900 block">{student.name}</span>
@@ -2984,11 +3356,43 @@ export default function App() {
                                         </div>
 
                                         <div className="bg-white border p-3 rounded-md max-h-32 overflow-y-auto leading-relaxed text-slate-700 whitespace-pre-wrap">
-                                          {sub.textContent}
+                                          {sub.textContent || <span className="text-slate-450 italic">No text solutions provided.</span>}
                                         </div>
 
+                                        {sub.fileUrl && (
+                                          <div className="bg-white border border-slate-200 rounded-lg p-2.5 flex items-center justify-between gap-3">
+                                            <div className="flex items-center space-x-2.5 min-w-0">
+                                              <div className="p-1 bg-indigo-50 text-indigo-600 rounded">
+                                                <FileText className="w-3.5 h-3.5 shrink-0" />
+                                              </div>
+                                              <span className="text-[10.5px] font-bold text-slate-700 truncate max-w-[155px]" title={sub.fileUrl.split("/").pop()}>
+                                                Homework PDF: {sub.fileUrl.split("/").pop() || "homework.pdf"}
+                                              </span>
+                                            </div>
+                                            <div className="flex items-center space-x-1.5 shrink-0">
+                                              <button 
+                                                type="button"
+                                                onClick={() => handlePreviewDocument(sub.fileUrl, `Submission: ${student.name}`)}
+                                                className="text-[9.5px] font-bold text-indigo-750 bg-indigo-55/10 hover:bg-indigo-55/20 border border-indigo-200/50 px-2.5 py-1 rounded transition cursor-pointer flex items-center gap-1.5"
+                                              >
+                                                <Eye className="w-3 h-3 text-indigo-600" />
+                                                <span>Preview</span>
+                                              </button>
+                                              <a 
+                                                href={sub.fileUrl} 
+                                                target="_blank" 
+                                                rel="noreferrer" 
+                                                className="text-[9.5px] font-bold text-slate-600 hover:text-indigo-600 bg-slate-50 border border-slate-200 px-2.5 py-1 rounded transition flex items-center gap-1 cursor-pointer"
+                                              >
+                                                <ExternalLink className="w-3 h-3" />
+                                                <span>Open</span>
+                                              </a>
+                                            </div>
+                                          </div>
+                                        )}
+
                                         {sub.grade ? (
-                                          <div className="bg-indigo-50 border border-indigo-100 p-2 text-indigo-950 rounded-sm">
+                                          <div className="bg-indigo-50 border border-indigo-100 p-2.5 text-indigo-950 rounded-lg">
                                             <strong>Evaluated Grade:</strong> {sub.grade} | <strong>Feedback:</strong> {sub.feedback}
                                           </div>
                                         ) : (
@@ -3031,7 +3435,7 @@ export default function App() {
 
                                             <button 
                                               onClick={() => saveManualEvaluation(sub.id)}
-                                              className="w-full bg-slate-900 hover:bg-black text-white py-1.5 text-xs font-semibold rounded-sm transition"
+                                              className="w-full bg-slate-900 hover:bg-black text-white py-1.5 text-xs font-semibold rounded-sm transition cursor-pointer"
                                             >
                                               Save grade & Release to student
                                             </button>
@@ -3045,6 +3449,7 @@ export default function App() {
                             </div>
                           )}
                         </div>
+                      </div>
                       ) : (
                         <div className="h-full border-2 border-dashed border-slate-200 rounded-xl flex flex-col items-center justify-center p-8 text-center text-slate-400 text-xs min-h-[220px]">
                           <FileText className="w-12 h-12 text-slate-305 mb-2" />
@@ -3285,6 +3690,352 @@ export default function App() {
                 </motion.div>
               )}
 
+              {/* Class Notice Board Tab Panel */}
+              {activeClassTab === 'board' && (
+                <motion.div
+                  key="board"
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -10 }}
+                  transition={{ duration: 0.15, ease: "easeInOut" }}
+                  className="space-y-6 text-left"
+                >
+                  {/* Notice Board Header */}
+                  <div className="bg-slate-900 text-white rounded-2xl p-6 border border-slate-800 shadow-md flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                    <div className="space-y-1">
+                      <div className="flex items-center space-x-2.5">
+                        <Megaphone className="w-5 h-5 text-indigo-400" />
+                        <h3 className="text-sm font-black uppercase tracking-wider text-slate-100">Class Notice Board & Discussion Hub</h3>
+                      </div>
+                      <p className="text-xs text-slate-400">
+                        Post course announcements, pin critical reminders, ask curriculum questions, and upvote student solutions.
+                      </p>
+                    </div>
+
+                    <div className="flex items-center space-x-2 shrink-0">
+                      {/* Search Notice Input */}
+                      <div className="relative">
+                        <span className="absolute inset-y-0 left-0 flex items-center pl-2.5 pointer-events-none text-slate-400">
+                          <Search className="w-3.5 h-3.5" />
+                        </span>
+                        <input
+                          type="text"
+                          placeholder="Search notices..."
+                          value={noticeSearchQuery}
+                          onChange={(e) => setNoticeSearchQuery(e.target.value)}
+                          className="pl-8 pr-3 py-1.5 w-full sm:w-44 border border-slate-700 rounded-lg text-xs bg-slate-800 text-white focus:outline-hidden focus:ring-1 focus:ring-indigo-500 font-medium placeholder:text-slate-500"
+                        />
+                      </div>
+
+                      {(currentUser?.role === 'teacher' || currentUser?.role === 'admin') && (
+                        <button
+                          onClick={() => setShowNewNoticeForm(!showNewNoticeForm)}
+                          className="bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold py-1.5 px-3.5 rounded-lg flex items-center space-x-1 transition active:scale-95 shadow-md cursor-pointer"
+                        >
+                          <Plus className="w-3.5 h-3.5" />
+                          <span>New Post</span>
+                        </button>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* New Notice Form Card */}
+                  <AnimatePresence>
+                    {showNewNoticeForm && (
+                      <motion.div
+                        initial={{ opacity: 0, height: 0 }}
+                        animate={{ opacity: 1, height: 'auto' }}
+                        exit={{ opacity: 0, height: 0 }}
+                        className="bg-white border border-slate-200 rounded-2xl p-5 shadow-xs overflow-hidden"
+                      >
+                        <h4 className="text-xs font-bold text-slate-900 uppercase tracking-widest border-b border-slate-100 pb-2 mb-4">Create General Notice or Question</h4>
+                        <div className="space-y-4 text-xs">
+                          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            <div className="md:col-span-2">
+                              <label className="block text-slate-500 font-bold uppercase tracking-wider text-[10px] mb-1">Notice Title</label>
+                              <input
+                                type="text"
+                                placeholder="e.g. Diagnostic Assessment or Chapter 4 Study Guide Updates..."
+                                value={newNoticeData.title}
+                                onChange={(e) => setNewNoticeData({ ...newNoticeData, title: e.target.value })}
+                                className="w-full border rounded-lg p-2 bg-slate-50 text-slate-800 focus:bg-white"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-slate-500 font-bold uppercase tracking-wider text-[10px] mb-1">Category Badge</label>
+                              <select
+                                value={newNoticeData.category}
+                                onChange={(e) => setNewNoticeData({ ...newNoticeData, category: e.target.value })}
+                                className="w-full border rounded-lg p-2 bg-white text-slate-700"
+                              >
+                                <option value="general">General Notification</option>
+                                <option value="important">🚨 Urgent Alert</option>
+                                <option value="homework">📝 Homework / Task Guide</option>
+                                <option value="q_and_a">❓ Student Question Board</option>
+                              </select>
+                            </div>
+                          </div>
+
+                          <div>
+                            <label className="block text-slate-500 font-bold uppercase tracking-wider text-[10px] mb-1">Notice Body Content</label>
+                            <textarea
+                              rows={4}
+                              placeholder="Describe assignment modifications, pin schedules, or write specific questions for the class cohort..."
+                              value={newNoticeData.content}
+                              onChange={(e) => setNewNoticeData({ ...newNoticeData, content: e.target.value })}
+                              className="w-full border rounded-lg p-2.5 bg-slate-50 text-slate-800 focus:bg-white"
+                            />
+                          </div>
+
+                          <div className="flex justify-end space-x-2">
+                            <button
+                              onClick={() => setShowNewNoticeForm(false)}
+                              className="px-4 py-2 border border-slate-200 text-slate-500 hover:bg-slate-50 rounded-lg font-bold"
+                            >
+                              Cancel
+                            </button>
+                            <button
+                              onClick={handleAddNotice}
+                              disabled={!newNoticeData.title.trim() || !newNoticeData.content.trim()}
+                              className="px-4 py-2 bg-indigo-600 disabled:opacity-50 text-white rounded-lg font-bold hover:bg-indigo-700 cursor-pointer"
+                            >
+                              Publish to Board
+                            </button>
+                          </div>
+                        </div>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+
+                  {/* Notice Posts Feed */}
+                  {(() => {
+                    // Filter based on selected class and search query
+                    const classIdFilter = selectedClass?.id || 1;
+                    const query = noticeSearchQuery.toLowerCase().trim();
+                    const filtered = classNoticePosts.filter(post => {
+                      if (post.classId !== classIdFilter) return false;
+                      if (!query) return true;
+                      return (
+                        post.title.toLowerCase().includes(query) ||
+                        post.content.toLowerCase().includes(query) ||
+                        post.authorName.toLowerCase().includes(query)
+                      );
+                    });
+
+                    // Sort: pinned first, then newest first
+                    const sorted = [...filtered].sort((a, b) => {
+                      if (a.pinned && !b.pinned) return -1;
+                      if (!a.pinned && b.pinned) return 1;
+                      return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+                    });
+
+                    if (sorted.length === 0) {
+                      return (
+                        <div className="p-12 text-center bg-white border border-slate-200 rounded-2xl text-slate-400 text-xs flex flex-col items-center justify-center space-y-4 shadow-3xs">
+                          <MessageSquare className="w-10 h-10 text-slate-300" />
+                          <p className="max-w-md leading-relaxed font-mono text-center">
+                            No notifications or questions matching filter criteria. Create your first announcement to begin discussion!
+                          </p>
+                          {currentUser?.role !== 'student' && (
+                            <button
+                              onClick={() => setShowNewNoticeForm(true)}
+                              className="bg-indigo-600 text-white font-bold py-1.5 px-4 rounded-lg flex items-center space-x-1 cursor-pointer"
+                            >
+                              <Plus className="w-3.5 h-3.5" />
+                              <span>Create First Announcement</span>
+                            </button>
+                          )}
+                        </div>
+                      );
+                    }
+
+                    const getCategoryStyle = (cat: string) => {
+                      switch (cat) {
+                        case 'important':
+                          return 'bg-red-50 text-red-600 border-red-100';
+                        case 'homework':
+                          return 'bg-amber-50 text-amber-700 border-amber-100';
+                        case 'q_and_a':
+                          return 'bg-indigo-50 text-indigo-700 border-indigo-100';
+                        default:
+                          return 'bg-slate-50 text-slate-600 border-slate-150';
+                      }
+                    };
+
+                    const getCategoryLabel = (cat: string) => {
+                      switch (cat) {
+                        case 'important': return '🚨 Urgent Alert';
+                        case 'homework': return '📝 Homework Guide';
+                        case 'q_and_a': return '❓ Peer Q&A';
+                        default: return '📢 Notice';
+                      }
+                    };
+
+                    return (
+                      <div className="space-y-4">
+                        {sorted.map((post) => {
+                          const hasUpvoted = currentUser && post.upvotedBy?.includes(currentUser.id);
+                          const commentsList = post.comments || [];
+                          // Sort verified answers to the top
+                          const sortedComments = [...commentsList].sort((a, b) => {
+                            if (a.isAnswer && !b.isAnswer) return -1;
+                            if (!a.isAnswer && b.isAnswer) return 1;
+                            return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
+                          });
+
+                          return (
+                            <div
+                              key={post.id}
+                              className={`bg-white border rounded-2xl shadow-3xs transition-all overflow-hidden ${post.pinned ? 'border-indigo-400 ring-1 ring-indigo-500/10' : 'border-slate-200 hover:border-slate-300'}`}
+                            >
+                              {/* Post Header */}
+                              <div className="p-5 pb-4 border-b border-slate-50">
+                                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-2.5">
+                                  <div className="flex items-center space-x-2">
+                                    <span className={`text-[9px] font-bold px-2.5 py-0.5 rounded-full border uppercase ${getCategoryStyle(post.category)}`}>
+                                      {getCategoryLabel(post.category)}
+                                    </span>
+                                    {post.pinned && (
+                                      <span className="bg-indigo-50 text-indigo-600 text-[9px] font-black py-0.5 px-2 rounded-full flex items-center border border-indigo-100">
+                                        <Pin className="w-2.5 h-2.5 mr-1 text-indigo-500 fill-indigo-500" />
+                                        PINNED
+                                      </span>
+                                    )}
+                                  </div>
+
+                                  {/* Author and Date metadata */}
+                                  <div className="text-[10px] text-slate-450 font-mono">
+                                    Posted by <strong>{post.authorName}</strong> • {new Date(post.createdAt).toLocaleDateString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                                  </div>
+                                </div>
+
+                                <h4 className="text-sm font-bold text-slate-900 mb-1 leading-snug">
+                                  {post.title}
+                                </h4>
+                                <p className="text-xs text-slate-650 leading-relaxed whitespace-pre-line select-text">
+                                  {post.content}
+                                </p>
+                              </div>
+
+                              {/* Interactive Bar */}
+                              <div className="bg-slate-50/50 px-5 py-2.5 flex items-center justify-between text-xs border-b border-slate-50">
+                                <div className="flex items-center space-x-4">
+                                  {/* Upvote Button */}
+                                  <button
+                                    onClick={() => handleUpvoteNotice(post.id)}
+                                    className={`flex items-center space-x-1.5 font-bold text-[10.5px] py-1 px-2.5 rounded-lg border transition active:scale-95 cursor-pointer ${hasUpvoted ? 'bg-indigo-600 border-indigo-600 text-white' : 'bg-white hover:bg-slate-105 border-slate-200 text-slate-650'}`}
+                                  >
+                                    <ThumbsUp className="w-3.5 h-3.5" />
+                                    <span>{post.upvotes || 0} Upvotes</span>
+                                  </button>
+
+                                  {/* Comments Counter */}
+                                  <span className="text-slate-500 font-medium flex items-center space-x-1.5 text-[10.5px]">
+                                    <MessageSquare className="w-3.5 h-3.5 text-slate-400" />
+                                    <span>{commentsList.length} Responses</span>
+                                  </span>
+                                </div>
+
+                                {/* Educator controls */}
+                                {(currentUser?.role === 'teacher' || currentUser?.role === 'admin') && (
+                                  <div className="flex items-center space-x-1.5">
+                                    <button
+                                      onClick={() => handleTogglePinNotice(post.id)}
+                                      className={`p-1.5 border hover:bg-slate-100 rounded-lg transition text-slate-400 hover:text-indigo-600 cursor-pointer ${post.pinned ? 'bg-indigo-50 border-indigo-150 text-indigo-600' : 'bg-white border-slate-200'}`}
+                                      title={post.pinned ? "Unpin Announcement" : "Pin Announcement to Top"}
+                                    >
+                                      <Pin className="w-3.5 h-3.5" />
+                                    </button>
+                                    <button
+                                      onClick={() => handleDeleteNotice(post.id)}
+                                      className="p-1.5 bg-white border border-slate-200 hover:border-red-200 hover:bg-red-50 text-slate-400 hover:text-red-650 rounded-lg transition cursor-pointer"
+                                      title="Delete Announcement"
+                                    >
+                                      <Trash2 className="w-3.5 h-3.5" />
+                                    </button>
+                                  </div>
+                                )}
+                              </div>
+
+                              {/* Comments Section */}
+                              <div className="bg-slate-50/35 p-5 space-y-4">
+                                {/* Comment list */}
+                                {sortedComments.length > 0 && (
+                                  <div className="space-y-2.5">
+                                    {sortedComments.map((comm) => (
+                                      <div
+                                        key={comm.id}
+                                        className={`p-3 rounded-xl border text-xs text-left transition-all ${comm.isAnswer ? 'bg-emerald-50/45 border-emerald-200 shadow-3xs' : 'bg-white border-slate-150'}`}
+                                      >
+                                        <div className="flex justify-between items-start mb-1.5">
+                                          <div>
+                                            <span className="font-bold text-slate-900 mr-1.5">{comm.authorName}</span>
+                                            {comm.isAnswer && (
+                                              <span className="bg-emerald-100 text-emerald-800 text-[8.5px] font-black px-1.5 py-0.5 rounded uppercase tracking-wider">
+                                                ✓ Verified Educator Answer
+                                              </span>
+                                            )}
+                                          </div>
+                                          <span className="text-[9.5px] text-slate-400 font-mono">
+                                            {new Date(comm.createdAt).toLocaleDateString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                                          </span>
+                                        </div>
+
+                                        <p className="text-slate-700 leading-relaxed text-[11px] select-text">
+                                          {comm.content}
+                                        </p>
+
+                                        {/* Verification Action (Teacher-only) */}
+                                        {(currentUser?.role === 'teacher' || currentUser?.role === 'admin') && (
+                                          <div className="flex justify-end pt-1.5">
+                                            <button
+                                              onClick={() => handleToggleCommentAnswer(post.id, comm.id)}
+                                              className={`text-[9.5px] font-bold px-2 py-0.5 rounded-md border flex items-center space-x-1 transition active:scale-95 cursor-pointer ${comm.isAnswer ? 'bg-red-50 border-red-100 text-red-600 hover:bg-red-100/50' : 'bg-white hover:bg-slate-50 border-slate-200 text-emerald-650 hover:text-emerald-700'}`}
+                                            >
+                                              {comm.isAnswer ? (
+                                                <span>Remove Verification</span>
+                                              ) : (
+                                                <>
+                                                  <CheckCircle className="w-3 h-3 text-emerald-500" />
+                                                  <span>Verify as Official Answer</span>
+                                                </>
+                                              )}
+                                            </button>
+                                          </div>
+                                        )}
+                                      </div>
+                                    ))}
+                                  </div>
+                                )}
+
+                                {/* Write a reply field */}
+                                <div className="flex items-start space-x-2">
+                                  <textarea
+                                    rows={1}
+                                    placeholder="Write a reply or answer this student question..."
+                                    value={noticeReplyTexts[post.id] || ""}
+                                    onChange={(e) => setNoticeReplyTexts({ ...noticeReplyTexts, [post.id]: e.target.value })}
+                                    className="w-full text-[11px] text-slate-850 placeholder-slate-400 rounded-lg border border-slate-200 bg-white p-2 outline-hidden focus:ring-1 focus:ring-indigo-400 focus:border-indigo-400 transition"
+                                  />
+                                  <button
+                                    onClick={() => handleAddNoticeComment(post.id)}
+                                    disabled={!(noticeReplyTexts[post.id] || "").trim()}
+                                    className="bg-indigo-600 disabled:opacity-50 text-white hover:bg-indigo-700 px-3 py-2 text-[10.5px] font-bold rounded-lg transition shrink-0 cursor-pointer flex items-center space-x-1"
+                                  >
+                                    <Send className="w-3 h-3" />
+                                    <span>Reply</span>
+                                  </button>
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    );
+                  })()}
+                </motion.div>
+              )}
+
               {/* Analytics tab panel with AI recommendations */}
               {activeClassTab === 'analytics' && (
                 <motion.div
@@ -3363,6 +4114,509 @@ export default function App() {
                                 <li key={i}>{rec}</li>
                               ))}
                             </ul>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Class Leaderboard Component */}
+                      {(() => {
+                        const totalAsgs = activeClassAssignments?.length || 0;
+                        
+                        // Compute performance metrics for each student
+                        const leaderboardData = classroomStudents.map(student => {
+                          const studentSubmissions = activeClassSubmissions.filter(sub => sub.studentId === student.id);
+                          const gradedSubs = studentSubmissions.filter(sub => sub.status === 'graded' && sub.grade);
+                          
+                          const gradesArray = gradedSubs.map(sub => {
+                            const parsed = parseFloat(sub.grade);
+                            return isNaN(parsed) ? null : parsed;
+                          }).filter(g => g !== null) as number[];
+
+                          const avgGrade = gradesArray.length > 0
+                            ? Math.round(gradesArray.reduce((acc, curr) => acc + curr, 0) / gradesArray.length)
+                            : null;
+
+                          const submittedCount = studentSubmissions.length;
+                          const submissionRate = totalAsgs > 0 ? Math.round((submittedCount / totalAsgs) * 100) : 0;
+
+                          return {
+                            student,
+                            avgGrade,
+                            gradedCount: gradesArray.length,
+                            submittedCount,
+                            submissionRate,
+                          };
+                        });
+
+                        // Filter based on search query
+                        const filteredLeaderboard = leaderboardData.filter(item => {
+                          const query = leaderboardSearch.toLowerCase().trim();
+                          if (!query) return true;
+                          return (
+                            item.student.name?.toLowerCase().includes(query) ||
+                            item.student.email?.toLowerCase().includes(query)
+                          );
+                        });
+
+                        // Sort based on sort option
+                        const sortedLeaderboard = [...filteredLeaderboard].sort((a, b) => {
+                          if (leaderboardSortBy === 'grade') {
+                            if (a.avgGrade === null && b.avgGrade !== null) return 1;
+                            if (a.avgGrade !== null && b.avgGrade === null) return -1;
+                            if (a.avgGrade !== null && b.avgGrade !== null) {
+                              if (b.avgGrade !== a.avgGrade) {
+                                return b.avgGrade - a.avgGrade;
+                              }
+                            }
+                            if (b.submissionRate !== a.submissionRate) {
+                              return b.submissionRate - a.submissionRate;
+                            }
+                          } else if (leaderboardSortBy === 'rate') {
+                            if (b.submissionRate !== a.submissionRate) {
+                              return b.submissionRate - a.submissionRate;
+                            }
+                            if (a.avgGrade === null && b.avgGrade !== null) return 1;
+                            if (a.avgGrade !== null && b.avgGrade === null) return -1;
+                            if (a.avgGrade !== null && b.avgGrade !== null) {
+                              return b.avgGrade - a.avgGrade;
+                            }
+                          }
+                          return (a.student.name || '').localeCompare(b.student.name || '');
+                        });
+
+                        const getGradeDetails = (score: number | null) => {
+                          if (score === null) return { letter: '—', color: 'bg-slate-100 text-slate-550 border-slate-200' };
+                          if (score >= 90) return { letter: 'A', color: 'bg-emerald-50 text-emerald-700 border-emerald-200' };
+                          if (score >= 80) return { letter: 'B', color: 'bg-blue-50 text-blue-700 border-blue-200' };
+                          if (score >= 70) return { letter: 'C', color: 'bg-amber-50 text-amber-700 border-amber-200' };
+                          if (score >= 60) return { letter: 'D', color: 'bg-orange-50 text-orange-700 border-orange-200' };
+                          return { letter: 'F', color: 'bg-red-50 text-red-700 border-red-200' };
+                        };
+
+                        return (
+                          <div className="bg-white border border-slate-200 rounded-2xl shadow-xs overflow-hidden">
+                            {/* Card Header */}
+                            <div className="p-5 border-b border-slate-100 bg-slate-50/50 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                              <div className="space-y-1">
+                                <h3 className="text-xs font-bold text-slate-900 uppercase tracking-widest flex items-center">
+                                  <Trophy className="w-4 h-4 text-amber-550 mr-2" />
+                                  Class Leaderboard
+                                </h3>
+                                <p className="text-[11px] text-slate-550">
+                                  Rankings based on average evaluated assignment scores and overall work completion rate.
+                                </p>
+                              </div>
+
+                              {/* Search & Sorting Controls */}
+                              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 text-xs">
+                                <div className="relative">
+                                  <span className="absolute inset-y-0 left-0 flex items-center pl-2.5 pointer-events-none text-slate-400">
+                                    <Search className="w-3.5 h-3.5" />
+                                  </span>
+                                  <input 
+                                    type="text"
+                                    placeholder="Search student..."
+                                    value={leaderboardSearch}
+                                    onChange={(e) => setLeaderboardSearch(e.target.value)}
+                                    className="pl-8 pr-3 py-1.5 w-full sm:w-44 border border-slate-200 rounded-lg text-xs bg-white text-slate-900 focus:outline-hidden focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 font-medium"
+                                  />
+                                </div>
+
+                                <div className="flex items-center space-x-1 border border-slate-200 rounded-lg p-0.5 bg-slate-100">
+                                  <button
+                                    onClick={() => setLeaderboardSortBy('grade')}
+                                    className={`px-2.5 py-1 rounded-md text-[10px] font-bold transition-all ${leaderboardSortBy === 'grade' ? 'bg-white text-slate-900 shadow-2xs' : 'text-slate-500 hover:text-slate-800'}`}
+                                  >
+                                    Grade Avg
+                                  </button>
+                                  <button
+                                    onClick={() => setLeaderboardSortBy('rate')}
+                                    className={`px-2.5 py-1 rounded-md text-[10px] font-bold transition-all ${leaderboardSortBy === 'rate' ? 'bg-white text-slate-900 shadow-2xs' : 'text-slate-500 hover:text-slate-800'}`}
+                                  >
+                                    Completion
+                                  </button>
+                                  <button
+                                    onClick={() => setLeaderboardSortBy('name')}
+                                    className={`px-2.5 py-1 rounded-md text-[10px] font-bold transition-all ${leaderboardSortBy === 'name' ? 'bg-white text-slate-900 shadow-2xs' : 'text-slate-550 hover:text-slate-850'}`}
+                                  >
+                                    Name
+                                  </button>
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* Leaderboard Table */}
+                            {sortedLeaderboard.length === 0 ? (
+                              <div className="p-10 text-center text-slate-450 text-xs italic">
+                                {leaderboardSearch ? "No students match your search filter." : "No students have grades or submissions in this classroom."}
+                              </div>
+                            ) : (
+                              <div className="overflow-x-auto">
+                                <table className="w-full text-left text-xs divide-y divide-slate-100">
+                                  <thead className="bg-slate-50/30">
+                                    <tr className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">
+                                      <th className="py-3 px-5 text-center w-16">Rank</th>
+                                      <th className="py-3 px-4">Student</th>
+                                      <th className="py-3 px-4 text-center">Submission Status</th>
+                                      <th className="py-3 px-4 text-center">Average Grade</th>
+                                      <th className="py-3 px-4 text-center">Tier</th>
+                                      <th className="py-3 px-5 text-right">Action</th>
+                                    </tr>
+                                  </thead>
+                                  <tbody className="divide-y divide-slate-50">
+                                    {sortedLeaderboard.map((item, index) => {
+                                      const isCurrentUser = currentUser?.id === item.student.id;
+                                      const gradeDetails = getGradeDetails(item.avgGrade);
+                                      const rank = index + 1;
+
+                                      let rankBadge;
+                                      if (rank === 1) {
+                                        rankBadge = (
+                                          <div className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-amber-50 border border-amber-200 text-amber-700 shadow-2xs">
+                                            <Trophy className="w-4 h-4 fill-amber-400 text-amber-500" />
+                                          </div>
+                                        );
+                                      } else if (rank === 2) {
+                                        rankBadge = (
+                                          <div className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-slate-100 border border-slate-200 text-slate-700 shadow-2xs">
+                                            <Medal className="w-4 h-4 fill-slate-300 text-slate-400" />
+                                          </div>
+                                        );
+                                      } else if (rank === 3) {
+                                        rankBadge = (
+                                          <div className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-orange-50 border border-orange-100 text-orange-750 shadow-2xs">
+                                            <Award className="w-4 h-4 text-orange-500 fill-orange-250" />
+                                          </div>
+                                        );
+                                      } else {
+                                        rankBadge = (
+                                          <div className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-slate-50 border border-slate-100 text-slate-500 font-bold text-[10px]">
+                                            {rank}
+                                          </div>
+                                        );
+                                      }
+
+                                      return (
+                                        <tr 
+                                          key={item.student.id} 
+                                          className={`hover:bg-indigo-50/10 transition-all ${isCurrentUser ? 'bg-indigo-50/20' : ''}`}
+                                        >
+                                          <td className="py-3 px-5 text-center font-bold">
+                                            {rankBadge}
+                                          </td>
+
+                                          <td className="py-3 px-4">
+                                            <div>
+                                              <div className="font-bold text-slate-900 flex items-center gap-1.5">
+                                                {item.student.name}
+                                                {isCurrentUser && (
+                                                  <span className="bg-indigo-100 text-indigo-750 text-[9px] font-black px-1.5 py-0.5 rounded-full uppercase tracking-wider">
+                                                    You
+                                                  </span>
+                                                )}
+                                              </div>
+                                              <div className="text-[10px] text-slate-450 font-mono">{item.student.email}</div>
+                                            </div>
+                                          </td>
+
+                                          <td className="py-3 px-4">
+                                            <div className="max-w-[150px] mx-auto space-y-1">
+                                              <div className="flex justify-between items-center text-[10px]">
+                                                <span className="font-bold text-slate-600">{item.submissionRate}% Done</span>
+                                                <span className="text-slate-400">{item.submittedCount}/{totalAsgs} units</span>
+                                              </div>
+                                              <div className="w-full h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                                                <div 
+                                                  className={`h-full rounded-full transition-all duration-500 ${
+                                                    item.submissionRate >= 80 ? 'bg-emerald-500' :
+                                                    item.submissionRate >= 50 ? 'bg-amber-500' : 'bg-rose-500'
+                                                  }`}
+                                                  style={{ width: `${item.submissionRate}%` }}
+                                                ></div>
+                                              </div>
+                                            </div>
+                                          </td>
+
+                                          <td className="py-3 px-4 text-center">
+                                            {item.avgGrade !== null ? (
+                                              <span className="text-sm font-black text-slate-800 font-mono">
+                                                {item.avgGrade}%
+                                              </span>
+                                            ) : (
+                                              <span className="text-slate-400 italic font-mono">—</span>
+                                            )}
+                                          </td>
+
+                                          <td className="py-3 px-4 text-center">
+                                            <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-black border uppercase ${gradeDetails.color}`}>
+                                              {gradeDetails.letter}
+                                            </span>
+                                          </td>
+
+                                          <td className="py-3 px-5 text-right">
+                                            <button
+                                              onClick={() => {
+                                                setSelectedStudentIdForSummary(item.student.id);
+                                                setActiveClassTab('student_summary');
+                                              }}
+                                              className="inline-flex items-center space-x-1 py-1 px-2.5 rounded-lg border border-slate-200 hover:border-slate-300 hover:bg-slate-50 transition text-[10px] font-bold text-slate-650 active:scale-95 cursor-pointer"
+                                              title="View student summary evaluation"
+                                            >
+                                              <span>Analyze</span>
+                                              <ArrowUpRight className="w-3.5 h-3.5" />
+                                            </button>
+                                          </td>
+                                        </tr>
+                                      );
+                                    })}
+                                  </tbody>
+                                </table>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })()}
+
+                      {/* Visual Seating Grid & Smart Group Maker Dashboard */}
+                      <div className="bg-white border border-slate-200 rounded-2xl shadow-xs overflow-hidden">
+                        {/* Tab Headers inside the card */}
+                        <div className="p-5 border-b border-slate-100 bg-slate-50/55 flex flex-col md:flex-row md:items-center justify-between gap-4">
+                          <div className="space-y-1">
+                            <h3 className="text-xs font-bold text-slate-900 uppercase tracking-widest flex items-center">
+                              <LayoutGrid className="w-4.5 h-4.5 text-indigo-550 mr-2" />
+                              Classroom Layout & Project Squad Planner
+                            </h3>
+                            <p className="text-[11px] text-slate-550">
+                              Establish visual seat maps or generate academically balanced project group rosters instantly.
+                            </p>
+                          </div>
+                        </div>
+
+                        {/* Interactive Workspace Tools */}
+                        <div className="p-6 space-y-6">
+                          {/* Inner tools grid */}
+                          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+                            
+                            {/* Visual Seating Map Desk Grid */}
+                            <div className="lg:col-span-7 space-y-4 text-left">
+                              <div className="flex items-center justify-between">
+                                <span className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                                  <Users className="w-4 h-4 text-slate-500" />
+                                  Visual Seating Desk Map (4 × 5)
+                                </span>
+                                <div className="flex items-center space-x-2">
+                                  <button
+                                    onClick={handleAutoAssignSeating}
+                                    className="bg-slate-100 hover:bg-slate-200 text-slate-750 text-[10px] font-bold py-1 px-2.5 rounded transition cursor-pointer"
+                                    title="Auto-fill seats sequentially"
+                                  >
+                                    Auto-Fill sequential
+                                  </button>
+                                  <button
+                                    onClick={handleClearSeating}
+                                    className="border border-slate-200 hover:border-red-200 hover:bg-red-50 text-slate-500 hover:text-red-650 text-[10px] font-bold py-1 px-2.5 rounded transition cursor-pointer"
+                                    title="Clear Seating Chart"
+                                  >
+                                    Reset Layout
+                                  </button>
+                                </div>
+                              </div>
+
+                              <div className="p-4 bg-slate-50 border border-slate-150 rounded-xl">
+                                <div className="grid grid-cols-5 gap-3">
+                                  {Array.from({ length: 4 }).map((_, rIndex) => (
+                                    Array.from({ length: 5 }).map((_, cIndex) => {
+                                      const prefix = `${selectedClass?.id || 1}_`;
+                                      // Find student seated here
+                                      const seatedStudentId = Object.keys(classSeating).find(key => {
+                                        if (!key.startsWith(prefix)) return false;
+                                        const pos = classSeating[key];
+                                        return pos.row === rIndex && pos.col === cIndex;
+                                      })?.substring(prefix.length);
+
+                                      const seatedStudentObj = seatedStudentId 
+                                        ? classroomStudents.find(s => String(s.id) === String(seatedStudentId)) 
+                                        : null;
+
+                                      // Get list of unseated students
+                                      const seatedStudentIds = Object.keys(classSeating)
+                                        .filter(key => key.startsWith(prefix))
+                                        .map(key => key.substring(prefix.length));
+
+                                      const unseatedStudents = classroomStudents.filter(s => !seatedStudentIds.includes(String(s.id)));
+
+                                      return (
+                                        <div 
+                                          key={`${rIndex}-${cIndex}`} 
+                                          className={`relative border rounded-lg p-2.5 text-center min-h-[75px] flex flex-col items-center justify-center transition-all ${
+                                            seatedStudentObj 
+                                              ? 'bg-white border-indigo-200 shadow-3xs' 
+                                              : 'bg-slate-100/50 border-dashed border-slate-250 hover:bg-slate-100'
+                                          }`}
+                                        >
+                                          {/* Desk Coordinates label */}
+                                          <span className="absolute top-1 right-1 text-[7.5px] font-mono font-bold text-slate-350">
+                                            R{rIndex+1}C{cIndex+1}
+                                          </span>
+
+                                          {seatedStudentObj ? (
+                                            <div className="w-full flex flex-col items-center justify-between h-full pt-1.5 text-center">
+                                              <div className="w-6 h-6 rounded-full bg-indigo-100 text-indigo-700 flex items-center justify-center text-[9px] font-bold uppercase shrink-0">
+                                                {seatedStudentObj.name.charAt(0)}
+                                              </div>
+                                              <div className="text-[9.5px] font-bold text-slate-800 truncate w-full text-center mt-1">
+                                                {seatedStudentObj.name.split(' ')[0]}
+                                              </div>
+                                              <button
+                                                onClick={() => {
+                                                  const key = `${prefix}${seatedStudentObj.id}`;
+                                                  setClassSeating(prev => {
+                                                    const copy = { ...prev };
+                                                    delete copy[key];
+                                                    return copy;
+                                                  });
+                                                }}
+                                                className="absolute -top-1 -left-1 w-4 h-4 rounded-full bg-red-100 hover:bg-red-200 text-red-700 flex items-center justify-center text-[9px] font-bold transition shadow-3xs cursor-pointer"
+                                                title="Unassign desk"
+                                              >
+                                                ×
+                                              </button>
+                                            </div>
+                                          ) : (
+                                            <div className="w-full pt-2">
+                                              {unseatedStudents.length > 0 ? (
+                                                <select
+                                                  onChange={(e) => {
+                                                    if (e.target.value) {
+                                                      handleAssignSeat(e.target.value, rIndex, cIndex);
+                                                    }
+                                                  }}
+                                                  className="w-full text-[8.5px] font-bold text-slate-400 bg-transparent border-0 focus:ring-0 cursor-pointer outline-hidden text-center truncate"
+                                                  defaultValue=""
+                                                >
+                                                  <option value="" disabled>Desk Empty</option>
+                                                  {unseatedStudents.map(std => (
+                                                    <option key={std.id} value={std.id} className="text-slate-800">
+                                                      Assign: {std.name.split(' ')[0]}
+                                                    </option>
+                                                  ))}
+                                                </select>
+                                              ) : (
+                                                <span className="text-[8.5px] font-bold text-slate-350 italic">Full Desk</span>
+                                              )}
+                                            </div>
+                                          )}
+                                        </div>
+                                      );
+                                    })
+                                  ))}
+                                </div>
+                                <div className="mt-3 text-center">
+                                  <div className="inline-block px-5 py-1 rounded bg-slate-200/80 border text-[9px] font-black tracking-wider uppercase text-slate-500">
+                                    FRONT BOARD / INSTRUCTOR PODIUM
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* Smart Group Maker planner */}
+                            <div className="lg:col-span-5 space-y-4 border-t lg:border-t-0 lg:border-l border-slate-100 lg:pl-6 pt-4 lg:pt-0 text-left">
+                              <span className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                                <Shuffle className="w-4 h-4 text-slate-500" />
+                                Roster Smart Team Maker (Balanced Metrics)
+                              </span>
+
+                              <div className="space-y-4">
+                                <p className="text-[10.5px] text-slate-550 leading-relaxed">
+                                  Distributes student cohorts into project study squads automatically. Balances assignments evaluation metrics to ensure performance levels are distributed evenly.
+                                </p>
+
+                                <div className="flex items-center space-x-3 text-xs bg-slate-50 p-3.5 border border-slate-150 rounded-xl">
+                                  <div className="space-y-1">
+                                    <label className="block text-[10px] font-bold uppercase text-slate-500">Max size per squad</label>
+                                    <input
+                                      type="number"
+                                      min={2}
+                                      max={10}
+                                      value={groupSizeInput}
+                                      onChange={(e) => setGroupSizeInput(parseInt(e.target.value) || 3)}
+                                      className="border rounded p-1.5 w-16 text-center font-bold bg-white"
+                                    />
+                                  </div>
+
+                                  <div className="flex-1 flex space-x-2 pt-4">
+                                    <button
+                                      onClick={() => handleGenerateGroups(groupSizeInput)}
+                                      className="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-3 rounded text-[11px] transition active:scale-95 cursor-pointer shadow-3xs"
+                                    >
+                                      Create Squads
+                                    </button>
+                                    {classGroups.length > 0 && (
+                                      <button
+                                        onClick={handleClearGroups}
+                                        className="border border-slate-200 hover:bg-slate-100 text-slate-650 font-bold py-2 px-3 rounded text-[11px] transition cursor-pointer"
+                                      >
+                                        Clear
+                                      </button>
+                                    )}
+                                  </div>
+                                </div>
+
+                                {/* Generated groups display */}
+                                {classGroups.length > 0 ? (
+                                  <div className="space-y-2 max-h-[220px] overflow-y-auto">
+                                    {classGroups.map((group) => {
+                                      // Calculate group avg grade
+                                      const groupGrades: number[] = [];
+                                      group.members.forEach((m: any) => {
+                                        const sub = activeClassSubmissions.filter(s => s.studentId === m.id);
+                                        const graded = sub.filter(s => s.status === 'graded' && s.grade);
+                                        graded.forEach(s => {
+                                          const parsed = parseFloat(s.grade);
+                                          if (!isNaN(parsed)) groupGrades.push(parsed);
+                                        });
+                                      });
+                                      const groupAvg = groupGrades.length > 0
+                                        ? Math.round(groupGrades.reduce((a, b) => a + b, 0) / groupGrades.length)
+                                        : 75;
+
+                                      return (
+                                        <div key={group.id} className="p-3 border border-slate-200 bg-white rounded-xl shadow-3xs text-xs space-y-1.5 text-left">
+                                          <div className="flex justify-between items-center border-b border-slate-50 pb-1">
+                                            <span className="font-bold text-slate-800">{group.name}</span>
+                                            <span className="bg-indigo-50 text-indigo-750 border border-indigo-100 px-2 py-0.5 rounded text-[9px] font-black">
+                                              Avg Grade: {groupAvg}%
+                                            </span>
+                                          </div>
+                                          <div className="flex flex-wrap gap-1.5 pt-1">
+                                            {group.members.map((member: any) => (
+                                              <span key={member.id} className="bg-slate-100 text-slate-750 px-2 py-1 rounded-md text-[9.5px] font-semibold flex items-center">
+                                                {member.name.split(' ')[0]}
+                                              </span>
+                                            ))}
+                                          </div>
+                                        </div>
+                                      );
+                                    })}
+                                    <button
+                                      onClick={() => {
+                                        const exportText = classGroups.map(g => `${g.name}: ${g.members.map((m: any) => m.name).join(', ')}`).join('\n');
+                                        navigator.clipboard.writeText(exportText);
+                                        triggerAlert("Balanced project rosters copied to clipboard!", "ok");
+                                      }}
+                                      className="w-full text-center border border-dashed border-indigo-200 hover:border-indigo-300 text-indigo-600 text-[10.5px] font-bold py-1.5 rounded-lg transition cursor-pointer"
+                                    >
+                                      Export Squad Roster list
+                                    </button>
+                                  </div>
+                                ) : (
+                                  <div className="p-6 border border-dashed rounded-xl text-center text-slate-400 text-[10.5px] font-mono">
+                                    No squads formed yet. Choose squad size and click 'Create Squads' to launch distribution.
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+
                           </div>
                         </div>
                       </div>
@@ -4654,6 +5908,120 @@ export default function App() {
                   </div>
                 </div>
               )}
+            </motion.div>
+          </div>
+        )}
+
+        {/* Inline PDF / Document Previewer Modal */}
+        {previewPdfUrl && (
+          <div className="fixed inset-0 bg-slate-950/75 backdrop-blur-md flex items-center justify-center z-50 p-4 sm:p-6 md:p-10">
+            <motion.div 
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              className="bg-slate-900 border border-slate-800 text-left rounded-2xl w-full max-w-5xl h-[85vh] flex flex-col shadow-2xl overflow-hidden"
+            >
+              {/* Previewer Header */}
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-slate-800 p-4 sm:px-6 bg-slate-950/40 gap-4 shrink-0">
+                <div className="flex items-center space-x-3 min-w-0">
+                  <div className="p-2 bg-indigo-500/10 text-indigo-400 rounded-xl border border-indigo-500/20">
+                    <BookOpen className="w-5 h-5 shrink-0" />
+                  </div>
+                  <div className="min-w-0">
+                    <span className="text-[10px] font-bold text-indigo-400 uppercase tracking-widest font-mono block">Document Inline Previewer</span>
+                    <h3 className="text-xs sm:text-sm font-black text-slate-150 truncate max-w-[280px] sm:max-w-md md:max-w-xl" title={previewPdfTitle}>
+                      {previewPdfTitle}
+                    </h3>
+                  </div>
+                </div>
+
+                {/* Controls toolbar */}
+                <div className="flex items-center space-x-2 self-end sm:self-auto shrink-0">
+                  {/* Download button */}
+                  <a 
+                    href={previewPdfUrl} 
+                    download
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-[11px] font-bold text-slate-300 hover:text-white bg-slate-800 hover:bg-slate-700 border border-slate-700 hover:border-slate-600 rounded-lg px-3 py-1.5 flex items-center space-x-1.5 transition-all shadow-3xs cursor-pointer"
+                    title="Download original file"
+                  >
+                    <Download className="w-3.5 h-3.5" />
+                    <span className="hidden xs:inline">Download</span>
+                  </a>
+
+                  {/* Open in new tab */}
+                  <a 
+                    href={previewPdfUrl} 
+                    target="_blank" 
+                    rel="noopener noreferrer"
+                    className="text-[11px] font-bold text-slate-300 hover:text-white bg-slate-800 hover:bg-slate-700 border border-slate-700 hover:border-slate-600 rounded-lg px-3 py-1.5 flex items-center space-x-1.5 transition-all shadow-3xs cursor-pointer"
+                    title="Open document full size in a new tab"
+                  >
+                    <ExternalLink className="w-3.5 h-3.5 text-indigo-400" />
+                    <span className="hidden xs:inline">Full Screen</span>
+                  </a>
+
+                  {/* Divider line */}
+                  <div className="h-5 w-px bg-slate-800 mx-1"></div>
+
+                  {/* Close button */}
+                  <button 
+                    type="button" 
+                    onClick={handleClosePreview}
+                    className="text-slate-400 hover:text-white p-1.5 bg-slate-800 hover:bg-slate-700 border border-slate-700 hover:border-slate-600 rounded-lg transition-all cursor-pointer shadow-3xs"
+                    title="Close Previewer"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+
+              {/* Embed Workspace */}
+              <div className="flex-1 bg-slate-950 p-3 sm:p-5 flex items-center justify-center overflow-hidden relative">
+                {(() => {
+                  const isImage = /\.(jpeg|jpg|gif|png|svg|webp)($|\?)/i.test(previewPdfUrl);
+                  
+                  if (isImage) {
+                    return (
+                      <div className="w-full h-full flex items-center justify-center p-4 bg-slate-900/40 rounded-xl border border-slate-850 overflow-auto">
+                        <img 
+                          src={previewPdfUrl} 
+                          alt={previewPdfTitle}
+                          className="max-h-full max-w-full object-contain rounded-lg shadow-lg select-none"
+                          referrerPolicy="no-referrer"
+                        />
+                      </div>
+                    );
+                  }
+
+                  // Standard Google Docs embed viewer URL fallback for non-PDFs (e.g., .docx, .xlsx, .pptx)
+                  const isPdf = /\.(pdf)($|\?)/i.test(previewPdfUrl) || previewPdfUrl.includes("/vault/my-homework.pdf") || previewPdfUrl.includes("example.com");
+                  
+                  // For PDF, we can use the browser's high quality built-in viewer using iframe directly.
+                  // For other office documents, we can wrap in google docs viewer to show inline preview.
+                  const embedUrl = isPdf 
+                    ? previewPdfUrl 
+                    : `https://docs.google.com/gview?url=${encodeURIComponent(previewPdfUrl)}&embedded=true`;
+
+                  return (
+                    <div className="w-full h-full rounded-xl overflow-hidden border border-slate-850 shadow-inner bg-slate-900">
+                      <iframe 
+                        src={embedUrl} 
+                        className="w-full h-full border-0 bg-slate-900" 
+                        title="Document Viewer"
+                        allow="autoplay"
+                      />
+                    </div>
+                  );
+                })()}
+              </div>
+
+              {/* Previewer Footer info */}
+              <div className="bg-slate-950/60 border-t border-slate-800 px-6 py-3 flex justify-between items-center text-[10px] text-slate-500 font-mono shrink-0 select-none">
+                <span>Secure Sandbox Preview Mode</span>
+                <span className="hidden sm:inline">Press Esc or click top close button to exit</span>
+              </div>
             </motion.div>
           </div>
         )}

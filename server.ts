@@ -23,6 +23,40 @@ async function startServer() {
   const app = express();
   const PORT = 3000;
 
+  // Run database test on startup and log to file
+  try {
+    console.log("Running startup database test query...");
+    const testResult = await db.select().from(users).limit(1);
+    fs.writeFileSync("./db_test_status.log", JSON.stringify({
+      status: "success",
+      keys: {
+        SQL_HOST: process.env.SQL_HOST,
+        SQL_USER: process.env.SQL_USER,
+        SQL_PASSWORD: process.env.SQL_PASSWORD ? "SET" : "NOT SET",
+        SQL_DB_NAME: process.env.SQL_DB_NAME,
+      },
+      testResult
+    }, null, 2));
+    console.log("Startup database test query succeeded.");
+  } catch (err: any) {
+    console.error("Startup database test query failed:", err);
+    fs.writeFileSync("./db_test_status.log", JSON.stringify({
+      status: "error",
+      message: err.message,
+      stack: err.stack,
+      cause: err.cause ? {
+        message: err.cause.message,
+        stack: err.cause.stack
+      } : null,
+      keys: {
+        SQL_HOST: process.env.SQL_HOST,
+        SQL_USER: process.env.SQL_USER,
+        SQL_PASSWORD: process.env.SQL_PASSWORD ? "SET" : "NOT SET",
+        SQL_DB_NAME: process.env.SQL_DB_NAME,
+      }
+    }, null, 2));
+  }
+
   // Standard express body parsers
   app.use(express.json({ limit: "50mb" }));
   app.use(express.urlencoded({ limit: "50mb", extended: true }));
@@ -41,6 +75,24 @@ async function startServer() {
       console.error("Failed to notify user:", err);
     }
   }
+
+  // Temporary test DB endpoint to fetch info
+  app.get("/api/test-db", async (req, res) => {
+    try {
+      const keys = {
+        SQL_HOST: process.env.SQL_HOST,
+        SQL_USER: process.env.SQL_USER,
+        SQL_PASSWORD: process.env.SQL_PASSWORD ? "SET (length: " + process.env.SQL_PASSWORD.length + ")" : "NOT SET",
+        SQL_DB_NAME: process.env.SQL_DB_NAME,
+      };
+      
+      const testResult = await db.select().from(users).limit(1);
+      res.json({ status: "success", keys, testResult });
+    } catch (err: any) {
+      console.error("Test DB error:", err);
+      res.status(500).json({ status: "error", message: err.message, stack: err.stack, cause: err.cause });
+    }
+  });
 
   // API Route: Authentication synchronization
   app.post("/api/auth/sync", requireAuth, async (req: AuthRequest, res) => {

@@ -2,6 +2,16 @@
 import { drizzle } from 'drizzle-orm/node-postgres';
 import pg from 'pg';
 import * as schema from './schema.ts';
+import * as dotenv from 'dotenv';
+
+dotenv.config();
+
+console.log('Database Pool config keys found:', {
+  SQL_HOST: !!process.env.SQL_HOST,
+  SQL_USER: !!process.env.SQL_USER,
+  SQL_PASSWORD: !!process.env.SQL_PASSWORD,
+  SQL_DB_NAME: !!process.env.SQL_DB_NAME,
+});
 
 const { Pool } = pg;
 
