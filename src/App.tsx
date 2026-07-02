@@ -1,5 +1,5 @@
 // src/App.tsx
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, startTransition } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
   BookOpen, Users, FolderOpen, Calendar, GraduationCap, Folder, FolderPlus, Home, 
@@ -765,29 +765,29 @@ export default function App() {
     try {
       const headers = { 'x-demo-user-role': activeRole };
       
-      const mRes = await fetch(`/api/classes/${cid}/materials`, { headers });
-      const mData = await mRes.json();
-      if (Array.isArray(mData)) setActiveClassMaterials(mData);
+      const fetchJson = async (url: string) => {
+        const res = await fetch(url, { headers });
+        if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
+        return res.json();
+      };
 
-      const aRes = await fetch(`/api/classes/${cid}/assignments`, { headers });
-      const aData = await aRes.json();
-      if (Array.isArray(aData)) setActiveClassAssignments(aData);
+      const [mData, aData, mtData, attData, subData, statsData] = await Promise.all([
+        fetchJson(`/api/classes/${cid}/materials`).catch(() => []),
+        fetchJson(`/api/classes/${cid}/assignments`).catch(() => []),
+        fetchJson(`/api/classes/${cid}/meetings`).catch(() => []),
+        fetchJson(`/api/classes/${cid}/attendance`).catch(() => []),
+        fetchJson(`/api/classes/${cid}/student-submissions`).catch(() => []),
+        fetchJson(`/api/classes/${cid}/analytics`).catch(() => ({}))
+      ]);
 
-      const mtRes = await fetch(`/api/classes/${cid}/meetings`, { headers });
-      const mtData = await mtRes.json();
-      if (Array.isArray(mtData)) setActiveClassMeetings(mtData);
-
-      const attRes = await fetch(`/api/classes/${cid}/attendance`, { headers });
-      const attData = await attRes.json();
-      if (Array.isArray(attData)) setActiveClassAttendance(attData);
-
-      const subRes = await fetch(`/api/classes/${cid}/student-submissions`, { headers });
-      const subData = await subRes.json();
-      if (Array.isArray(subData)) setActiveClassSubmissions(subData);
-
-      const statsRes = await fetch(`/api/classes/${cid}/analytics`, { headers });
-      const statsData = await statsRes.json();
-      setActiveClassAnalytics(statsData);
+      startTransition(() => {
+        if (Array.isArray(mData)) setActiveClassMaterials(mData);
+        if (Array.isArray(aData)) setActiveClassAssignments(aData);
+        if (Array.isArray(mtData)) setActiveClassMeetings(mtData);
+        if (Array.isArray(attData)) setActiveClassAttendance(attData);
+        if (Array.isArray(subData)) setActiveClassSubmissions(subData);
+        setActiveClassAnalytics(statsData);
+      });
     } catch (err) {
       console.error("Failed to load Tab info", err);
     }
@@ -2655,7 +2655,11 @@ export default function App() {
                 return (
                   <button 
                     key={tab.key}
-                    onClick={() => setActiveClassTab(tab.key as any)}
+                    onClick={() => {
+                      startTransition(() => {
+                        setActiveClassTab(tab.key as any);
+                      });
+                    }}
                     className={`flex items-center space-x-2 py-3 border-b-2 font-bold select-none cursor-pointer transition-all ${activeClassTab === tab.key ? 'border-indigo-600 text-indigo-600 bg-linear-to-b from-transparent to-indigo-50/20' : 'border-transparent text-slate-500 hover:text-slate-800'}`}
                   >
                     <Icon className="w-4 h-4" />
@@ -2667,7 +2671,7 @@ export default function App() {
 
             {/* Tap Panel Contents */}
             <div className="pt-2">
-              <AnimatePresence mode="wait">
+              <AnimatePresence>
                 {/* Materials tab panel */}
                 {activeClassTab === 'materials' && (() => {
                   // Get folder list array for a material
@@ -4525,7 +4529,9 @@ export default function App() {
                                             <button
                                               onClick={() => {
                                                 setSelectedStudentIdForSummary(item.student.id);
-                                                setActiveClassTab('student_summary');
+                                                startTransition(() => {
+                                                  setActiveClassTab('student_summary');
+                                                });
                                               }}
                                               className="inline-flex items-center space-x-1 py-1 px-2.5 rounded-lg border border-slate-200 hover:border-slate-300 hover:bg-slate-50 transition text-[10px] font-bold text-slate-650 active:scale-95 cursor-pointer"
                                               title="View student summary evaluation"
