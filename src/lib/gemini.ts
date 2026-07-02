@@ -108,15 +108,16 @@ async function generateContentWithFallback(params: {
 }
 
 // AI Helper: Assignment Generator
-export async function generateAssignmentAI(assignmentType: string, topic: string) {
+export async function generateAssignmentAI(assignmentType: string, topic: string, referenceUrl?: string) {
   try {
-    const prompt = `You are an expert tutor. Generate an educational assignment for the following subject/type: "${assignmentType}" and topic: "${topic}".
-Generate unstructured content as JSON including:
+    const prompt = `Generate a high-quality educational assignment of type: "${assignmentType}".
+  The primary topic is: "${topic}".
+  ${referenceUrl ? `\nCRITICAL CONTEXT: The user has provided a reference document located at this URL: ${referenceUrl}\nIf you have browsing capabilities, or can extract context from the URL text itself, please base the assignment heavily on the contents of that document.` : ''}
+
+  Please provide the output strictly as a JSON object matching this schema including:
 1. "title": A suitable title.
 2. "instructions": Clear student instructions.
 3. "questions": An array of questions (at least 3-5). Each question should have "id" (number), "questionText", "type" (e.g., multiple_choice, short_answer), "options" (string array for multiple_choice, or null), "correctAnswer", and "explanation".
-4. "rubric": Grading guidelines as text or a list.
-
 Ensure the final response is strictly JSON matching this structure. Use standard educational criteria (e.g. ACT, AP, SAT format where applicable).`;
 
     const response = await generateContentWithFallback({

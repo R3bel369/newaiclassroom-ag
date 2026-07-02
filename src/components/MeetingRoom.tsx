@@ -14,7 +14,7 @@ export default function MeetingRoom({ meeting, currentUser, onLeave, classroomSt
   const [iframeLoaded, setIframeLoaded] = useState(false);
   const [miroTalkType, setMiroTalkType] = useState<'sfu' | 'p2p'>('sfu');
   const [copiedLink, setCopiedLink] = useState(false);
-  const [copiedMiroTalkLink, setCopiedMiroTalkLink] = useState(false);
+  const [iframeLoadCount, setIframeLoadCount] = useState(0);
 
   const cleanTitleVal = meeting.title.replace(/[^a-zA-Z0-9]/g, '');
   const cleanRoomName = `EduStage-${meeting.id}-${cleanTitleVal || 'ClassRoom'}`;
@@ -27,12 +27,12 @@ export default function MeetingRoom({ meeting, currentUser, onLeave, classroomSt
       const jitsiRoomMatch = meeting.joinLink.match(/(?:meet\.jit\.si|meet\.ffmuc\.net|jitsi\.belnet\.be)\/join\/([^?#/\s]+)/) || meeting.joinLink.match(/(?:meet\.jit\.si|meet\.ffmuc\.net|jitsi\.belnet\.be)\/([^?#/\s]+)/);
       const hostRoomId = jitsiRoomMatch ? jitsiRoomMatch[1] : cleanRoomName;
       return type === 'sfu' 
-        ? `https://sfu.mirotalk.com/join/${hostRoomId}`
-        : `https://p2p.mirotalk.com/join/${hostRoomId}`;
+        ? `https://sfu.mirotalk.com/join/${hostRoomId}?hideLeaveButton=1&leaveButton=0`
+        : `https://p2p.mirotalk.com/join/${hostRoomId}?hideLeaveButton=1&leaveButton=0`;
     }
     return type === 'sfu' 
-      ? `https://sfu.mirotalk.com/join/${cleanRoomName}`
-      : `https://p2p.mirotalk.com/join/${cleanRoomName}`;
+      ? `https://sfu.mirotalk.com/join/${cleanRoomName}?hideLeaveButton=1&leaveButton=0`
+      : `https://p2p.mirotalk.com/join/${cleanRoomName}?hideLeaveButton=1&leaveButton=0`;
   };
 
   const handleCopyLink = () => {
@@ -42,15 +42,9 @@ export default function MeetingRoom({ meeting, currentUser, onLeave, classroomSt
     setTimeout(() => setCopiedLink(false), 2500);
   };
 
-  const handleCopyMiroTalkLink = () => {
-    const miroUrl = getMiroTalkUrl();
-    navigator.clipboard.writeText(miroUrl);
-    setCopiedMiroTalkLink(true);
-    setTimeout(() => setCopiedMiroTalkLink(false), 2500);
-  };
-
   useEffect(() => {
     setIframeLoaded(false);
+    setIframeLoadCount(0);
   }, [miroTalkType, meeting.id]);
 
   return (
@@ -111,7 +105,7 @@ export default function MeetingRoom({ meeting, currentUser, onLeave, classroomSt
               <div className="flex items-center bg-slate-900 border border-slate-800 p-0.5 rounded-md mr-2">
                 <button
                   type="button"
-                  onClick={() => { setMiroTalkType('sfu'); setIframeLoaded(false); }}
+                  onClick={() => { setMiroTalkType('sfu'); setIframeLoaded(false); setIframeLoadCount(0); }}
                   className={`text-[9px] px-2 py-0.5 font-bold font-mono rounded-xs transition-all cursor-pointer ${miroTalkType === 'sfu' ? 'bg-indigo-600 text-white' : 'text-slate-400 hover:text-slate-200'}`}
                   title="SFU (Selective Forwarding Unit) - Recommended for groups"
                 >
@@ -119,30 +113,13 @@ export default function MeetingRoom({ meeting, currentUser, onLeave, classroomSt
                 </button>
                 <button
                   type="button"
-                  onClick={() => { setMiroTalkType('p2p'); setIframeLoaded(false); }}
+                  onClick={() => { setMiroTalkType('p2p'); setIframeLoaded(false); setIframeLoadCount(0); }}
                   className={`text-[9px] px-2 py-0.5 font-bold font-mono rounded-xs transition-all cursor-pointer ${miroTalkType === 'p2p' ? 'bg-indigo-600 text-white' : 'text-slate-400 hover:text-slate-200'}`}
                   title="Peer-to-Peer - Ideal for 1-on-1 sessions"
                 >
                   P2P Mode
                 </button>
               </div>
-              <button 
-                onClick={handleCopyMiroTalkLink}
-                className={`flex items-center space-x-1.5 border py-1.5 px-3 rounded-md text-[11px] font-mono font-bold transition-all active:scale-95 cursor-pointer ${copiedMiroTalkLink ? 'bg-emerald-600/20 border-emerald-500/50 text-emerald-400' : 'bg-slate-900 border-slate-700 text-slate-300 hover:border-indigo-500/50 hover:text-indigo-300'}`}
-              >
-                {copiedMiroTalkLink ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
-                <span>Copy MiroTalk Link</span>
-              </button>
-              <a 
-                href={getMiroTalkUrl()}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center space-x-1.5 bg-slate-800 hover:bg-slate-700 border border-slate-700 text-white font-semibold text-[11px] px-3 py-1.5 rounded-md transition-all active:scale-95 shadow-md shrink-0"
-                title="Open directly in MiroTalk bypassing the iframe"
-              >
-                <span>Open Standalone MiroTalk</span>
-                <ExternalLink className="w-3.5 h-3.5" />
-              </a>
             </div>
           )}
           
@@ -183,9 +160,19 @@ export default function MeetingRoom({ meeting, currentUser, onLeave, classroomSt
         
         <iframe 
           src={getMiroTalkUrl()}
-          allow="camera; microphone; fullscreen; display-capture; autoplay; clipboard-write; clipboard-read"
+          allow="camera *; microphone *; fullscreen *; display-capture *; autoplay *; clipboard-write *; clipboard-read *"
           className="absolute top-0 left-0 w-full h-full border-0"
-          onLoad={() => setIframeLoaded(true)}
+          onLoad={() => {
+            setIframeLoaded(true);
+            setIframeLoadCount(prev => {
+              if (prev >= 1) {
+                // If it loads a second time, it means MiroTalk navigated to the feedback/leave page!
+                // We immediately close the meeting.
+                onLeave();
+              }
+              return prev + 1;
+            });
+          }}
           referrerPolicy="no-referrer"
         />
       </div>

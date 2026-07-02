@@ -57,47 +57,16 @@ export const requireAuth = async (
         return res.status(403).json({ error: 'Access forbidden: User account is suspended' });
       }
       
-      // Auto upgrade if matched
-      let needsUpdate = false;
-      let correctRole = userRecords[0].role;
-      let correctName = userRecords[0].name;
-
-      if (decodedToken.email === "software3369@gmail.com" && userRecords[0].role !== "teacher") {
-        correctRole = "teacher";
-        correctName = "Dr. Sarah Taylor";
-        needsUpdate = true;
-      } else if (decodedToken.email === "admink338@gmail.com" && userRecords[0].role !== "admin") {
-        correctRole = "admin";
-        correctName = "Institution Administrator";
-        needsUpdate = true;
-      } else if (decodedToken.email === "kssg8790@gmail.com" && userRecords[0].role !== "student") {
-        correctRole = "student";
-        correctName = "Emily Johnson";
-        needsUpdate = true;
-      }
-
-      if (needsUpdate) {
-        const updated = await db.update(users)
-          .set({ role: correctRole, name: correctName })
-          .where(eq(users.id, userRecords[0].id))
-          .returning();
-        req.dbUser = updated[0];
-      } else {
-        req.dbUser = userRecords[0];
-      }
+      req.dbUser = userRecords[0];
     } else {
       // Lazy register
       let defaultRole = 'student';
-      let defaultName = decodedToken.name || 'Anonymous Learner';
+      let defaultName = decodedToken.name || 'Student';
+      
       if (decodedToken.email === 'software3369@gmail.com') {
         defaultRole = 'teacher';
-        defaultName = 'Dr. Sarah Taylor';
       } else if (decodedToken.email === 'admink338@gmail.com') {
         defaultRole = 'admin';
-        defaultName = 'Institution Administrator';
-      } else if (decodedToken.email === 'kssg8790@gmail.com') {
-        defaultRole = 'student';
-        defaultName = 'Emily Johnson';
       }
 
       const inserted = await db.insert(users).values({

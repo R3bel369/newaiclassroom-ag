@@ -8,7 +8,7 @@ import {
   ChevronRight, ArrowRight, Sparkles, Send, Award, FileText, 
   Tv, ClipboardCheck, ArrowUpRight, BarChart3, CloudLightning,
   ChevronDown, ExternalLink, RefreshCw, Upload, Check, UserMinus, PlusCircle, Copy, ChevronLeft, HelpCircle, RotateCcw, TrendingUp, CalendarRange, Sun, Moon, Lock, NotebookPen, X, Trophy, Medal, Download, Eye,
-  Megaphone, MessageSquare, ThumbsUp, Pin, Shuffle, LayoutGrid
+  Megaphone, MessageSquare, ThumbsUp, Pin, Shuffle, LayoutGrid, Paperclip
 } from 'lucide-react';
 import { 
   UserProfile, Classroom, LearningMaterial, 
@@ -64,8 +64,10 @@ export default function App() {
   const [currentUser, setCurrentUser] = useState<UserProfile | null>(null);
   
   // Custom Login page variables and handlers
-  const [loginEmail, setLoginEmail] = useState("");
-  const [loginPassword, setLoginPassword] = useState("");
+  const [loginEmail, setLoginEmail] = useState('');
+  const [loginPassword, setLoginPassword] = useState('');
+  const [isSignUp, setIsSignUp] = useState(false);
+  const [signupName, setSignupName] = useState('');
   const [loginLoading, setLoginLoading] = useState(false);
   const [loginError, setLoginError] = useState<string | null>(null);
 
@@ -81,27 +83,45 @@ export default function App() {
     e.preventDefault();
     setLoginLoading(true);
     setLoginError(null);
+
     try {
-      let { data, error } = await supabase.auth.signInWithPassword({
+      const { data, error } = await supabase.auth.signInWithPassword({
         email: loginEmail,
         password: loginPassword,
       });
-      if (error && error.message.toLowerCase().includes("credentials")) {
-        const res = await supabase.auth.signUp({
-          email: loginEmail,
-          password: loginPassword,
-          options: { data: { name: loginEmail.split('@')[0] } }
-        });
-        data = res.data;
-        error = res.error;
-      }
-      if (error) throw error;
-      if (data.session) {
-        setIsLoggedIn(true);
-        triggerAlert("Logged in successfully!");
+
+      if (error) {
+        throw new Error(error.message);
       }
     } catch (err: any) {
-      setLoginError(err.message || "An error occurred");
+      setLoginError(err.message || 'Authentication failed');
+    } finally {
+      setLoginLoading(false);
+    }
+  };
+
+  const handleSignUp = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!signupName.trim()) {
+      setLoginError("Name is required to sign up.");
+      return;
+    }
+    setLoginLoading(true);
+    setLoginError(null);
+    try {
+      const { data, error } = await supabase.auth.signUp({
+        email: loginEmail,
+        password: loginPassword,
+        options: {
+          data: {
+            name: signupName
+          }
+        }
+      });
+      if (error) throw new Error(error.message);
+      triggerAlert("Account created successfully! You are now logged in.", 'ok');
+    } catch (err: any) {
+      setLoginError(err.message || 'Sign up failed');
     } finally {
       setLoginLoading(false);
     }
@@ -117,12 +137,7 @@ export default function App() {
   };
 
   const handleQuickFill = (role: 'admin' | 'teacher' | 'student') => {
-    const email = role === 'admin' 
-      ? 'admin@classroom.com' 
-      : role === 'teacher' 
-        ? 'sarah.taylor@classroom.com' 
-        : 'emily.johnson@classroom.com';
-    setLoginEmail(email);
+    setLoginEmail(`${role}@classroom.com`);
     setLoginPassword("123456");
     setLoginError(null);
   };
@@ -190,6 +205,9 @@ export default function App() {
   // Form Creator states
   const [showClassModal, setShowClassModal] = useState(false);
   const [newClassData, setNewClassData] = useState({ name: "", subject: "", description: "", grade: "", academicYear: "", batchName: "" });
+  
+  const [showEditClassModal, setShowEditClassModal] = useState(false);
+  const [editClassData, setEditClassData] = useState({ name: "", description: "" });
   
   const [showUserModal, setShowUserModal] = useState(false);
   const [selectedUserToEdit, setSelectedUserToEdit] = useState<UserProfile | null>(null);
@@ -350,7 +368,7 @@ export default function App() {
   const [isSubmittingTeacherNote, setIsSubmittingTeacherNote] = useState(false);
 
   // AI assistant loading triggers
-  const [aiPrompts, setAiPrompts] = useState({ type: "act_test", topic: "" });
+  const [aiPrompts, setAiPrompts] = useState({ type: "act_test", topic: "", attachmentUrl: "" });
   const [aiGenerating, setAiGenerating] = useState(false);
   const [aiGradePending, setAiGradePending] = useState<number | null>(null);
 
@@ -498,6 +516,45 @@ export default function App() {
       setAssignmentUploading(false);
     }
   };
+
+  const handleAiReferenceUpload = async (file: File) => {
+    setAssignmentUploading(true);
+    try {
+      const reader = new FileReader();
+      reader.onload = async () => {
+        const base64Data = reader.result as string;
+        try {
+          const response = await fetch("/api/upload", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "x-demo-user-role": activeRole
+            },
+            body: JSON.stringify({
+              filename: file.name,
+              base64Data: base64Data
+            })
+          });
+          const result = await response.json();
+          if (response.ok && result.url) {
+            setAiPrompts(prev => ({ ...prev, attachmentUrl: result.url }));
+            triggerAlert(`Source document "${file.name}" uploaded successfully for AI analysis!`, "ok");
+          } else {
+            triggerAlert(result.error || "Failed to upload file", "err");
+          }
+        } catch (err: any) {
+          triggerAlert(err.message || "Network error", "err");
+        } finally {
+          setAssignmentUploading(false);
+        }
+      };
+      reader.readAsDataURL(file);
+    } catch (err: any) {
+      triggerAlert(err.message || "Error reading attachment", "err");
+      setAssignmentUploading(false);
+    }
+  };
+
   
   // Attendance grid states
   const [attendanceDate, setAttendanceDate] = useState<string>(new Date().toISOString().split('T')[0]);
@@ -821,6 +878,26 @@ export default function App() {
     }
   }, [activeClassTab, selectedClass, selectedStudentIdForSummary, classroomStudents, currentUser, activeRole]);
 
+  // Synchronize attendance grid when date, attendance data, or students change
+  useEffect(() => {
+    if (classroomStudents.length > 0) {
+      const newGrid: Record<number, any> = {};
+      // Default everyone to present
+      classroomStudents.forEach(s => {
+        newGrid[s.id] = 'present';
+      });
+
+      // Override with saved records for the selected date if they exist
+      if (activeClassAttendance && activeClassAttendance.length > 0) {
+        const recordsForDate = activeClassAttendance.filter(a => a.record.date === attendanceDate);
+        recordsForDate.forEach(a => {
+          newGrid[a.record.studentId] = a.record.status;
+        });
+      }
+      setAttendanceGrid(newGrid);
+    }
+  }, [attendanceDate, activeClassAttendance, classroomStudents]);
+
   // --- NOTICE BOARD FUNCTIONS ---
   const handleAddNotice = () => {
     if (!newNoticeData.title.trim() || !newNoticeData.content.trim() || !selectedClass) return;
@@ -1038,6 +1115,55 @@ export default function App() {
       } else {
         const err = await res.json();
         triggerAlert(err.error || "Failed to create", "err");
+      }
+    } catch (err: any) {
+      triggerAlert(err.message, "err");
+    }
+  };
+
+  const updateClassroom = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedClass) return;
+    try {
+      const res = await fetch(`/api/classes/${selectedClass.id}`, {
+        method: "PUT",
+        headers: { 
+          "Content-Type": "application/json",
+          "x-demo-user-role": activeRole
+        },
+        body: JSON.stringify(editClassData)
+      });
+      if (res.ok) {
+        triggerAlert("Classroom updated successfully!");
+        setShowEditClassModal(false);
+        fetchUsersAndSync();
+        // Update selected class locally to avoid extra fetch
+        setSelectedClass({ ...selectedClass, name: editClassData.name, description: editClassData.description });
+      } else {
+        const err = await res.json();
+        triggerAlert(err.error || "Failed to update", "err");
+      }
+    } catch (err: any) {
+      triggerAlert(err.message, "err");
+    }
+  };
+
+  const deleteClassroom = async () => {
+    if (!selectedClass) return;
+    if (!window.confirm("Are you sure you want to permanently delete this classroom? All materials, assignments, and data will be lost.")) return;
+    try {
+      const res = await fetch(`/api/classes/${selectedClass.id}`, {
+        method: "DELETE",
+        headers: { "x-demo-user-role": activeRole }
+      });
+      if (res.ok) {
+        triggerAlert("Classroom deleted permanently.");
+        setShowEditClassModal(false);
+        setSelectedClass(null);
+        fetchUsersAndSync();
+      } else {
+        const err = await res.json();
+        triggerAlert(err.error || "Failed to delete", "err");
       }
     } catch (err: any) {
       triggerAlert(err.message, "err");
@@ -1563,7 +1689,7 @@ export default function App() {
           "Content-Type": "application/json",
           "x-demo-user-role": activeRole
         },
-        body: JSON.stringify({ type: aiPrompts.type, topic: aiPrompts.topic })
+        body: JSON.stringify({ type: aiPrompts.type, topic: aiPrompts.topic, attachmentUrl: aiPrompts.attachmentUrl })
       });
       const data = await res.json();
       if (data.success) {
@@ -1719,13 +1845,16 @@ export default function App() {
       if (!token) {
         // Add the scope to the provider
         try {
+          // @ts-ignore
           googleAuthProvider.addScope('https://www.googleapis.com/auth/meetings.space.created');
         } catch (scErr) {
           console.log("Scope add context:", scErr);
         }
         
         // Open Google authentication popup
+        // @ts-ignore
         const result = await signInWithPopup(auth, googleAuthProvider);
+        // @ts-ignore
         const credential = GoogleAuthProvider.credentialFromResult(result);
         if (!credential?.accessToken) {
           throw new Error('Could not retrieve Google OAuth access token from authorization.');
@@ -1823,6 +1952,7 @@ export default function App() {
       if (res.ok) {
         triggerAlert("Attendance logs registry secured!");
         fetchClassDetails(selectedClass.id);
+        fetchUsersAndSync();
       }
     } catch (err: any) {
       triggerAlert(err.message, "err");
@@ -1877,20 +2007,13 @@ export default function App() {
 
             {/* Login Card */}
             <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-xl overflow-hidden p-6 md:p-8 text-left">
-              <h3 className="text-md font-bold text-slate-800 dark:text-slate-100 mb-2">Simulated Secure Login</h3>
-              <p className="text-xs text-slate-500 dark:text-slate-400 mb-6">
-                Enter simulated user credentials. Any custom email starting with <code className="font-mono text-indigo-650 dark:text-indigo-400 font-semibold text-xs">admin</code>, <code className="font-mono text-indigo-655 dark:text-indigo-450 font-semibold text-xs">teacher</code>, or <code className="font-mono text-indigo-650 dark:text-indigo-400 font-semibold text-xs">student</code> will resolve to that Role.
-              </p>
-
-
-
+              <h3 className="text-md font-bold text-slate-800 dark:text-slate-100 mb-6">
+                {isSignUp ? "Create an Account" : "Login"}
+              </h3>
+              
               <div className="grid grid-cols-3 gap-2.5 mb-6">
                 {(['admin', 'teacher', 'student'] as const).map((role) => {
-                  const targetEmail = role === 'admin' 
-                    ? 'admin@classroom.com' 
-                    : role === 'teacher' 
-                      ? 'sarah.taylor@classroom.com' 
-                      : 'emily.johnson@classroom.com';
+                  const targetEmail = `${role}@classroom.com`;
                   const isSelected = loginEmail === targetEmail;
                   return (
                     <button
@@ -1910,7 +2033,26 @@ export default function App() {
               </div>
 
               {/* Form fields */}
-              <form onSubmit={handleDemoLogin} className="space-y-4">
+              <form onSubmit={isSignUp ? handleSignUp : handleDemoLogin} className="space-y-4">
+                {isSignUp && (
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-600 dark:text-slate-400 mb-1.5">
+                      Full Name
+                    </label>
+                    <div className="relative">
+                      <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-slate-400">
+                        <User className="w-4 h-4" />
+                      </span>
+                      <input
+                        type="text"
+                        required
+                        value={signupName}
+                        onChange={(e) => setSignupName(e.target.value)}
+                        className="w-full pl-9 pr-4 py-2 text-xs border border-slate-200 dark:border-slate-800 rounded-xl bg-slate-50 dark:bg-slate-950 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/20 text-slate-900 dark:text-white transition outline-none"
+                      />
+                    </div>
+                  </div>
+                )}
                 <div>
                   <label className="block text-xs font-semibold text-slate-600 dark:text-slate-400 mb-1.5">
                     Email Address
@@ -1959,18 +2101,33 @@ export default function App() {
                 <button
                   type="submit"
                   disabled={loginLoading}
-                  className="w-full py-2.5 bg-linear-to-r from-indigo-600 to-indigo-750 text-white font-bold text-xs rounded-xl shadow-md transition hover:opacity-95 disabled:opacity-50 cursor-pointer flex items-center justify-center space-x-1.5"
+                  className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs py-3 rounded-xl transition duration-200 flex items-center justify-center cursor-pointer disabled:opacity-50 mt-2"
                 >
                   {loginLoading ? (
                     <RefreshCw className="w-3.5 h-3.5 animate-spin text-white" />
                   ) : (
                     <>
-                      <LogIn className="w-3.5 h-3.5" />
-                      <span>Authenticate Securely</span>
+                      <ArrowRight className="w-4 h-4 mr-2" />
+                      {isSignUp ? "Create Account" : "Authenticate Securely"}
                     </>
                   )}
                 </button>
               </form>
+              
+              <div className="mt-6 text-center">
+                <p className="text-xs text-slate-500 dark:text-slate-400">
+                  {isSignUp ? "Already have an account?" : "Don't have an account?"}{' '}
+                  <button 
+                    onClick={() => {
+                      setIsSignUp(!isSignUp);
+                      setLoginError(null);
+                    }}
+                    className="font-bold text-indigo-600 hover:text-indigo-700 hover:underline cursor-pointer"
+                  >
+                    {isSignUp ? "Log in here" : "Sign up here"}
+                  </button>
+                </p>
+              </div>
             </div>
             
             <div className="text-center mt-6">
@@ -2398,7 +2555,6 @@ export default function App() {
                       </p>
                       <div className="h-px bg-slate-800"></div>
                       <div className="flex items-center justify-between text-[11px] text-slate-500 font-mono">
-                        <span>Model: gemini-3.5-flash</span>
                         <span>API Status: ACTIVE</span>
                       </div>
                     </div>
@@ -2420,9 +2576,21 @@ export default function App() {
                   Back to Classes
                 </button>
                 <ChevronRight className="w-4 h-4 text-slate-400" />
-                <div>
-                  <h2 className="text-lg font-bold text-slate-900">{selectedClass.name}</h2>
-                  <span className="text-[11px] text-slate-400 block font-mono">Join Code: {selectedClass.joinCode} | {selectedClass.grade}</span>
+                <div className="flex items-center space-x-2">
+                  <div>
+                    <h2 className="text-lg font-bold text-slate-900 flex items-center">{selectedClass.name}
+                      {(currentUser?.role === 'teacher' || currentUser?.role === 'admin') && (
+                        <button 
+                          onClick={() => { setEditClassData({ name: selectedClass.name, description: selectedClass.description || "" }); setShowEditClassModal(true); }}
+                          className="ml-2 text-slate-400 hover:text-indigo-600 transition"
+                          title="Edit Classroom Details"
+                        >
+                          <Settings className="w-4 h-4" />
+                        </button>
+                      )}
+                    </h2>
+                    <span className="text-[11px] text-slate-400 block font-mono">Join Code: {selectedClass.joinCode} | {selectedClass.grade}</span>
+                  </div>
                 </div>
               </div>
 
@@ -2990,18 +3158,52 @@ export default function App() {
                       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 text-xs">
                         <div>
                           <label className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block mb-1">Assignment Standard Model</label>
-                          <select 
-                            value={aiPrompts.type}
-                            onChange={(e) => setAiPrompts({ ...aiPrompts, type: e.target.value })}
-                            className="bg-slate-850 border border-slate-700 text-white rounded-md p-2.5 outline-hidden focus:border-indigo-400 w-full"
-                          >
-                            <option value="act_test">ACT English Standard Template</option>
-                            <option value="ap_test">AP Biology Structured Quiz</option>
-                            <option value="worksheet">Comprehensive Practice Worksheet</option>
-                            <option value="essay">Thematic Analysis Essay</option>
-                          </select>
+                          <div className="relative">
+                            <input 
+                              list="assignment-models"
+                              value={aiPrompts.type}
+                              onChange={(e) => setAiPrompts({ ...aiPrompts, type: e.target.value })}
+                              placeholder="Type or select a model..."
+                              className="bg-slate-850 border border-slate-700 text-white rounded-md p-2.5 outline-hidden focus:border-indigo-400 w-full"
+                            />
+                            <datalist id="assignment-models">
+                              <option value="ACT English Standard Template" />
+                              <option value="AP Biology Structured Quiz" />
+                              <option value="Comprehensive Practice Worksheet" />
+                              <option value="Thematic Analysis Essay" />
+                              <option value="Custom Topic Model" />
+                            </datalist>
+                          </div>
                         </div>
-                        <div className="sm:col-span-2">
+                        <div className="sm:col-span-1">
+                          <label className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block mb-1">Source Document</label>
+                          <div className="flex items-center space-x-2">
+                            <label className="bg-slate-850 hover:bg-slate-800 border border-slate-700 hover:border-slate-600 text-slate-200 rounded-md py-2.5 px-3 flex-1 flex items-center justify-center space-x-2 cursor-pointer transition">
+                              {assignmentUploading ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Paperclip className="w-3.5 h-3.5" />}
+                              <span className="text-xs truncate">{aiPrompts.attachmentUrl ? "Attached" : "Upload Reference"}</span>
+                              <input 
+                                type="file" 
+                                className="hidden" 
+                                accept=".pdf,.doc,.docx,.txt"
+                                onChange={(e) => {
+                                  if (e.target.files && e.target.files[0]) {
+                                    handleAiReferenceUpload(e.target.files[0]);
+                                  }
+                                }}
+                              />
+                            </label>
+                            {aiPrompts.attachmentUrl && (
+                              <button 
+                                onClick={() => setAiPrompts({...aiPrompts, attachmentUrl: ""})}
+                                className="bg-red-500/10 text-red-400 hover:bg-red-500/20 p-2.5 rounded-md transition"
+                                title="Remove Attachment"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                        <div className="sm:col-span-2 md:col-span-1">
                           <label className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block mb-1">Target Topic String</label>
                           <div className="flex space-x-2">
                             <input 
@@ -3566,30 +3768,7 @@ export default function App() {
                                   <span>Official Google Meet</span>
                                 </a>
                               )}
-                              {mt.joinLink && (mt.joinLink.includes('mirotalk.com') || mt.joinLink.includes('meet.jit.si') || mt.joinLink.includes('meet.ffmuc.net') || mt.joinLink.includes('jitsi.belnet.be')) && (
-                                <>
-                                  <button
-                                    onClick={() => {
-                                      navigator.clipboard.writeText(mt.joinLink);
-                                      triggerAlert("Direct MiroTalk session link copied to clipboard!", "ok");
-                                    }}
-                                    className="bg-indigo-50 hover:bg-indigo-105 text-indigo-700 border border-indigo-200 text-[11px] font-bold py-2 px-3.5 rounded-md transition duration-200 shrink-0 shadow-xs active:scale-95 flex items-center justify-center space-x-1 cursor-pointer"
-                                    title="Copy Direct MiroTalk URL"
-                                  >
-                                    <Copy className="w-3.5 h-3.5 text-indigo-600" />
-                                    <span>Copy MiroTalk URL</span>
-                                  </button>
-                                  <a 
-                                    href={mt.joinLink}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="bg-slate-700 hover:bg-slate-800 text-white text-[11px] font-bold py-2 px-3.5 rounded-md transition duration-200 shrink-0 shadow-sm active:scale-95 flex items-center justify-center space-x-1.5"
-                                  >
-                                    <ExternalLink className="w-3.5 h-3.5" />
-                                    <span>Open Standalone MiroTalk</span>
-                                  </a>
-                                </>
-                              )}
+
                               <button 
                                 onClick={() => setSelectedMeeting(mt)}
                                 className="bg-indigo-600 hover:bg-indigo-700 text-white text-[11px] font-bold py-2 px-4 rounded-md transition duration-200 shrink-0 shadow-sm active:scale-95 flex items-center justify-center space-x-1.5"
@@ -3632,11 +3811,11 @@ export default function App() {
                       /* Student sees their own attendance logs */
                       <div className="space-y-3 text-xs text-slate-700">
                         <p className="font-semibold text-slate-800">Your Attendance History Records in this class:</p>
-                        {activeClassAttendance.filter(a => a.record.studentId === currentUser.id).length === 0 ? (
+                        {activeClassAttendance.filter(a => a.student.email === currentUser?.email).length === 0 ? (
                           <div className="p-8 text-center text-slate-405 font-mono text-xs">No attendance marked yet.</div>
                         ) : (
                           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                            {activeClassAttendance.filter(a => a.record.studentId === currentUser.id).map((r, i) => (
+                            {activeClassAttendance.filter(a => a.student.email === currentUser?.email).map((r, i) => (
                               <div key={i} className="p-3 border border-slate-150 bg-slate-50/50 rounded-lg flex justify-between items-center">
                                 <span className="font-bold text-slate-800">{r.record.date}</span>
                                 <span className={`text-[9px] font-bold py-0.5 px-2 rounded-sm ${r.record.status === 'present' ? 'bg-emerald-50 text-emerald-600' : 'bg-red-50 text-red-650'}`}>
@@ -4672,6 +4851,11 @@ export default function App() {
                   ? Math.round(gradesArray.reduce((acc, curr) => acc + curr, 0) / gradesArray.length)
                   : 0;
 
+                const studentAttendanceRecords = activeClassAttendance.filter(a => a.record.studentId === targetStudentId);
+                const totalAttendance = studentAttendanceRecords.length;
+                const presentCount = studentAttendanceRecords.filter(a => a.record.status === 'present').length;
+                const attendancePercentage = totalAttendance > 0 ? Math.round((presentCount / totalAttendance) * 100) : 0;
+
                 const chartData = [...relevantAssignments]
                   .sort((a, b) => {
                     const da = a.dueDate ? new Date(a.dueDate).getTime() : 0;
@@ -4781,7 +4965,7 @@ export default function App() {
                     {targetStudentObj ? (
                       <div className="space-y-6">
                         {/* Dashboard KPI cards */}
-                        <div className="grid grid-cols-1 sm:grid-cols-4 gap-4 text-xs">
+                        <div className="grid grid-cols-1 sm:grid-cols-5 gap-4 text-xs">
                           <div className="bg-white border text-left p-4 rounded-xl shadow-xs border-slate-200">
                             <span className="text-[9px] uppercase tracking-wider text-slate-405 font-bold">Target Evaluator</span>
                             <h4 className="text-md font-black text-slate-900 mt-1 truncate">{targetStudentObj.name}</h4>
@@ -4814,6 +4998,16 @@ export default function App() {
                             </h4>
                             <span className="text-[10px] text-slate-400 mt-1 block">
                               Out of {deadlines.length} total upcoming tasks
+                            </span>
+                          </div>
+                          <div className="bg-white border text-left p-4 rounded-xl shadow-xs border-slate-200">
+                            <span className="text-[9px] uppercase tracking-wider text-slate-405 font-bold">Attendance Rate</span>
+                            <div className="flex items-baseline space-x-1.5 mt-1">
+                              <h4 className="text-2xl font-black text-slate-900">{attendancePercentage}%</h4>
+                              <span className="text-[10px] text-slate-405">present</span>
+                            </div>
+                            <span className="text-[10px] text-slate-400 mt-1 block">
+                              Based on {totalAttendance} marked session(s)
                             </span>
                           </div>
                         </div>
@@ -4964,6 +5158,74 @@ export default function App() {
                           </div>
                         </div>
 
+                        {/* Daily Attendance Logs */}
+                        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-5 shadow-xs space-y-4">
+                          <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-2 border-b dark:border-slate-800 pb-3">
+                            <div className="space-y-0.5 text-left">
+                              <div className="flex items-center space-x-2">
+                                <ClipboardCheck className="w-4.5 h-4.5 text-indigo-600 dark:text-indigo-400" />
+                                <h4 className="font-bold text-slate-900 dark:text-slate-100 text-xs text-left">Daily Attendance Register History</h4>
+                              </div>
+                              <p className="text-[10px] text-slate-400 dark:text-slate-500 text-left">
+                                A complete daily track record of presence or absence for this individual.
+                              </p>
+                            </div>
+                            
+                            {/* Monthly Count Addition */}
+                            <div className="bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-700/50 rounded-lg py-1.5 px-3 flex items-center space-x-3">
+                              {(() => {
+                                const currDate = new Date();
+                                const currMonth = currDate.getMonth();
+                                const currYear = currDate.getFullYear();
+                                const currentMonthRecords = studentAttendanceRecords.filter(a => {
+                                  const d = new Date(a.record.date);
+                                  return d.getMonth() === currMonth && d.getFullYear() === currYear;
+                                });
+                                const monthlyTotal = currentMonthRecords.length;
+                                const monthlyPresent = currentMonthRecords.filter(a => a.record.status === 'present').length;
+                                return (
+                                  <>
+                                    <div className="text-[9px] uppercase tracking-wider text-slate-400 dark:text-slate-500 font-bold text-right">
+                                      {currDate.toLocaleString('default', { month: 'short' })} Attendance
+                                    </div>
+                                    <div className="text-sm font-black text-slate-800 dark:text-slate-200">
+                                      {monthlyTotal > 0 ? `${monthlyPresent} / ${monthlyTotal}` : 'No Data'}
+                                    </div>
+                                  </>
+                                );
+                              })()}
+                            </div>
+                          </div>
+                          
+                          <div className="max-h-[200px] overflow-y-auto pr-2">
+                            {studentAttendanceRecords.length === 0 ? (
+                              <div className="py-8 text-center text-slate-400 text-[11px] italic">
+                                No daily attendance records found for {targetStudentObj.name}.
+                              </div>
+                            ) : (
+                              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-3">
+                                {studentAttendanceRecords.sort((a, b) => new Date(b.record.date).getTime() - new Date(a.record.date).getTime()).map((att, idx) => {
+                                  const status = att.record.status.toLowerCase();
+                                  let statusStyles = 'bg-slate-50 text-slate-600 dark:bg-slate-500/20 dark:text-slate-300';
+                                  if (status === 'present') statusStyles = 'bg-emerald-50 text-emerald-600 dark:bg-emerald-500/20 dark:text-emerald-400';
+                                  if (status === 'absent') statusStyles = 'bg-red-50 text-red-650 dark:bg-red-500/20 dark:text-red-400';
+                                  if (status === 'late') statusStyles = 'bg-amber-50 text-amber-600 dark:bg-amber-500/20 dark:text-amber-400';
+                                  if (status === 'excused') statusStyles = 'bg-indigo-50 text-indigo-600 dark:bg-indigo-500/20 dark:text-indigo-400';
+                                  
+                                  return (
+                                    <div key={idx} className="p-3 border border-slate-150 dark:border-slate-700/60 bg-slate-50/50 dark:bg-slate-800/40 rounded-lg flex justify-between items-center transition hover:border-slate-300 dark:hover:border-slate-600">
+                                      <span className="font-bold text-slate-800 dark:text-slate-200 text-[10px]">{att.record.date}</span>
+                                      <span className={`text-[8.5px] font-bold py-0.5 px-2 rounded-sm tracking-wider ${statusStyles}`}>
+                                        {att.record.status.toUpperCase()}
+                                      </span>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+
                         {/* Private Teacher Notes & QUALITATIVE EVALUATION LOGS */}
                         {(currentUser?.role === 'teacher' || currentUser?.role === 'admin') && (
                           <div className="bg-slate-50 border border-slate-200 rounded-xl p-5 shadow-xs space-y-4">
@@ -5052,6 +5314,37 @@ export default function App() {
               })()}
 
               </AnimatePresence>
+            </div>
+          </div>
+        )}
+
+        {/* Edit Class Modal */}
+        {showEditClassModal && selectedClass && (
+          <div className="fixed inset-0 bg-slate-950/60 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-xl shadow-2xl max-w-md w-full overflow-hidden">
+              <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50">
+                <h3 className="text-sm font-bold text-slate-800 flex items-center"><Settings className="w-4 h-4 mr-2 text-indigo-600" /> Edit Classroom</h3>
+                <button onClick={() => setShowEditClassModal(false)} className="text-slate-400 hover:text-slate-600 cursor-pointer"><X className="w-5 h-5" /></button>
+              </div>
+              <div className="p-6">
+                <form onSubmit={updateClassroom} className="space-y-4 text-left text-slate-700">
+                  <div>
+                    <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1">Class Name</label>
+                    <input type="text" value={editClassData.name} onChange={e => setEditClassData({...editClassData, name: e.target.value})} className="w-full border rounded p-2 text-xs" required />
+                  </div>
+                  <div>
+                    <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1">Description</label>
+                    <textarea rows={3} value={editClassData.description} onChange={e => setEditClassData({...editClassData, description: e.target.value})} className="w-full border rounded p-2 text-xs" />
+                  </div>
+                  <div className="pt-4 flex justify-between">
+                    <button type="button" onClick={deleteClassroom} className="text-red-500 hover:text-red-700 text-xs font-bold transition underline">Delete Classroom</button>
+                    <div className="space-x-3">
+                      <button type="button" onClick={() => setShowEditClassModal(false)} className="text-slate-500 hover:text-slate-700 text-xs font-semibold cursor-pointer transition">Cancel</button>
+                      <button type="submit" className="bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold py-2 px-5 rounded-md shadow-md active:scale-95 cursor-pointer transition">Update</button>
+                    </div>
+                  </div>
+                </form>
+              </div>
             </div>
           </div>
         )}
@@ -5148,11 +5441,11 @@ export default function App() {
               <form onSubmit={manageUserAccount} className="space-y-3 overflow-y-auto px-5 pb-5 text-xs flex-1 scrollbar-thin">
                 <div>
                   <label className="text-[10px] text-slate-500 font-bold uppercase tracking-wider block mb-1">Full Username</label>
-                  <input type="text" value={newUserData.name} onChange={e => setNewUserData({...newUserData, name: e.target.value})} placeholder="Emily Johnson" className="w-full border rounded p-2 text-xs" required />
+                  <input type="text" value={newUserData.name} onChange={e => setNewUserData({...newUserData, name: e.target.value})} placeholder="e.g. John Doe" className="w-full border rounded p-2 text-xs" required />
                 </div>
                 <div>
                   <label className="text-[10px] text-slate-500 font-bold uppercase tracking-wider block mb-1">Email link</label>
-                  <input type="email" value={newUserData.email} onChange={e => setNewUserData({...newUserData, email: e.target.value})} placeholder="emily.johnson@classroom.com" className="w-full border rounded p-2 text-xs" required />
+                  <input type="email" value={newUserData.email} onChange={e => setNewUserData({...newUserData, email: e.target.value})} placeholder="e.g. user@example.com" className="w-full border rounded p-2 text-xs" required />
                 </div>
                 <div className="grid grid-cols-2 gap-3">
                   <div>
@@ -6015,13 +6308,20 @@ export default function App() {
                   }
 
                   // Standard Google Docs embed viewer URL fallback for non-PDFs (e.g., .docx, .xlsx, .pptx)
+                  // Check if it's already a Google Drive or Google Docs link
+                  const isGoogleDrive = previewPdfUrl.includes('drive.google.com') || previewPdfUrl.includes('docs.google.com');
+
+                  // Standard Google Docs embed viewer URL fallback for non-PDFs (e.g., .docx, .xlsx, .pptx)
                   const isPdf = /\.(pdf)($|\?)/i.test(previewPdfUrl) || previewPdfUrl.includes("/vault/my-homework.pdf") || previewPdfUrl.includes("example.com");
                   
                   // For PDF, we can use the browser's high quality built-in viewer using iframe directly.
                   // For other office documents, we can wrap in google docs viewer to show inline preview.
-                  const embedUrl = isPdf 
-                    ? previewPdfUrl 
-                    : `https://docs.google.com/gview?url=${encodeURIComponent(previewPdfUrl)}&embedded=true`;
+                  let embedUrl = previewPdfUrl;
+                  if (isGoogleDrive) {
+                    embedUrl = previewPdfUrl.replace('/view', '/preview');
+                  } else if (!isPdf) {
+                    embedUrl = `https://docs.google.com/gview?url=${encodeURIComponent(previewPdfUrl)}&embedded=true`;
+                  }
 
                   return (
                     <div className="w-full h-full rounded-xl overflow-hidden border border-slate-850 shadow-inner bg-slate-900">

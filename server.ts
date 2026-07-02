@@ -600,6 +600,17 @@ export default app;
     }
   });
 
+  app.put("/api/classes/:id", requireAuth, async (req: AuthRequest, res) => {
+    try {
+      const cid = parseInt(req.params.id);
+      const { name, description } = req.body;
+      const updated = await db.update(classes).set({ name, description }).where(eq(classes.id, cid)).returning();
+      res.json({ success: true, class: updated[0] });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
   app.delete("/api/classes/:id", requireAuth, async (req: AuthRequest, res) => {
     try {
       const cid = parseInt(req.params.id);
@@ -769,7 +780,7 @@ export default app;
         title,
         description,
         instructions: instructions || null,
-        dueDate: dueDate ? new Date(dueDate) : null,
+        dueDate: dueDate ? String(dueDate) : null,
         maxMarks: maxMarks ? parseInt(maxMarks) : 100,
         type: type || "homework",
         status: status || "published",
@@ -799,12 +810,12 @@ export default app;
   // Trigger Gemini AI Assignment Generator
   app.post("/api/classes/:id/assignments/generate", requireAuth, async (req: AuthRequest, res) => {
     try {
-      const { type, topic } = req.body;
+      const { type, topic, attachmentUrl } = req.body;
       if (!type || !topic) {
         return res.status(400).json({ error: "Assignment type and topic are required." });
       }
 
-      const generated = await generateAssignmentAI(type, topic);
+      const generated = await generateAssignmentAI(type, topic, attachmentUrl);
       res.json({ success: true, assignment: generated });
     } catch (err: any) {
       res.status(500).json({ error: err.message });
