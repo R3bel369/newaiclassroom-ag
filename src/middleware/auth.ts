@@ -18,7 +18,10 @@ export const requireAuth = async (
   next: NextFunction
 ) => {
   if (!supabase) {
-    supabase = createClient(process.env.VITE_SUPABASE_URL!, process.env.VITE_SUPABASE_ANON_KEY!);
+    if (!process.env.VITE_SUPABASE_URL || !process.env.VITE_SUPABASE_ANON_KEY) {
+      return res.status(500).json({ error: "Server Configuration Error: Missing VITE_SUPABASE_URL or VITE_SUPABASE_ANON_KEY Environment Variables in Vercel." });
+    }
+    supabase = createClient(process.env.VITE_SUPABASE_URL, process.env.VITE_SUPABASE_ANON_KEY);
   }
 
   const authHeader = req.headers.authorization;
