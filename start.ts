@@ -3,9 +3,9 @@ dotenv.config();
 import fs from 'fs';
 import path from 'path';
 import { createServer as createViteServer } from 'vite';
-import { app } from './server.ts';
-import { db } from './src/db/index.ts';
-import { users } from './src/db/schema.ts';
+import { app } from './server.js';
+import { db } from './src/db/index.js';
+import { users } from './src/db/schema.js';
 
 const PORT = process.env.PORT || 3000;
 

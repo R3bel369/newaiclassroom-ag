@@ -4,7 +4,7 @@ import express from "express";
 import path from "path";
 import fs from "fs";
 import { createServer as createViteServer } from "vite";
-import { db } from "./src/db/index.ts";
+import { db } from "./src/db/index.js";
 import { 
   users, 
   classes, 
@@ -16,10 +16,10 @@ import {
   attendance, 
   notifications,
   teacherNotes
-} from "./src/db/schema.ts";
+} from "./src/db/schema.js";
 import { eq, and, or, inArray, desc, like, sql } from "drizzle-orm";
-import { requireAuth, AuthRequest } from "./src/middleware/auth.ts";
-import { generateAssignmentAI, gradeSubmissionAI, generateAnalyticsReportAI, generateStudyFlashcardsAI } from "./src/lib/gemini.ts";
+import { requireAuth, AuthRequest } from "./src/middleware/auth.js";
+import { generateAssignmentAI, gradeSubmissionAI, generateAnalyticsReportAI, generateStudyFlashcardsAI } from "./src/lib/gemini.js";
 
 export const app = express();
 export default app;

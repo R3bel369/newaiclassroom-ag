@@ -1,8 +1,8 @@
 // src/middleware/auth.ts
 import { Request, Response, NextFunction } from 'express';
 import { createClient } from '@supabase/supabase-js';
-import { db } from '../db/index.ts';
-import { users } from '../db/schema.ts';
+import { db } from '../db/index.js';
+import { users } from '../db/schema.js';
 import { eq } from 'drizzle-orm';
 
 let supabase: any;
