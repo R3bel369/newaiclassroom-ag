@@ -684,6 +684,7 @@ export default function App() {
   const fetchUsersAndSync = async () => {
     if (!isLoggedIn) return;
     try {
+      const headers = { 'x-demo-user-role': activeRole };
       // Sync Demo Profile
       const demoRes = await fetch('/api/auth/demo', {
         method: 'POST',
@@ -698,23 +699,26 @@ export default function App() {
         setCurrentUser(authData.user);
       }
 
-      // Sync all lists
-      const uRes = await fetch('/api/users', { headers: { 'x-demo-user-role': activeRole } });
-      const uData = await uRes.json();
-      if (Array.isArray(uData)) setUserList(uData);
+      const fetchJson = async (url: string) => {
+        const res = await fetch(url, { headers });
+        if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
+        return res.json();
+      };
 
-      const cRes = await fetch('/api/classes', { headers: { 'x-demo-user-role': activeRole } });
-      const cData = await cRes.json();
-      if (Array.isArray(cData)) setClassList(cData);
+      // Sync all lists concurrently
+      const [uData, cData, nData, sData] = await Promise.all([
+        fetchJson('/api/users').catch(() => []),
+        fetchJson('/api/classes').catch(() => []),
+        fetchJson('/api/notifications').catch(() => []),
+        fetchJson('/api/analytics/institution').catch(() => ({}))
+      ]);
 
-      const nRes = await fetch('/api/notifications', { headers: { 'x-demo-user-role': activeRole } });
-      const nData = await nRes.json();
-      if (Array.isArray(nData)) setNotificationList(nData);
-
-      // Extract statistics
-      const sRes = await fetch('/api/analytics/institution', { headers: { 'x-demo-user-role': activeRole } });
-      const sData = await sRes.json();
-      setInstStats(sData);
+      startTransition(() => {
+        if (Array.isArray(uData)) setUserList(uData);
+        if (Array.isArray(cData)) setClassList(cData);
+        if (Array.isArray(nData)) setNotificationList(nData);
+        setInstStats(sData);
+      });
 
       if (selectedClass) {
         // Reload classroom details
@@ -730,22 +734,32 @@ export default function App() {
     try {
       setCurrentFolderPath([]);
       setMaterialsSearchQuery("");
-      const clsRes = await fetch(`/api/classes/${cid}`, { headers: { 'x-demo-user-role': activeRole } });
-      const classroomObj = await clsRes.json();
-      setSelectedClass(classroomObj);
+      const headers = { 'x-demo-user-role': activeRole };
 
-      // Fetch students for class rosters / attendance
-      const sRes = await fetch(`/api/classes/${cid}/students`, { headers: { 'x-demo-user-role': activeRole } });
-      const sData = await sRes.json();
-      if (Array.isArray(sData)) {
-        setClassroomStudents(sData);
-        // Initialize attendance grid
-        const grid: Record<number, any> = {};
-        sData.forEach(s => {
-          grid[s.id] = 'present';
-        });
-        setAttendanceGrid(grid);
-      }
+      const fetchJson = async (url: string) => {
+        const res = await fetch(url, { headers });
+        if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
+        return res.json();
+      };
+
+      const [classroomObj, sData] = await Promise.all([
+        fetchJson(`/api/classes/${cid}`).catch(() => null),
+        fetchJson(`/api/classes/${cid}/students`).catch(() => [])
+      ]);
+
+      startTransition(() => {
+        if (classroomObj) setSelectedClass(classroomObj);
+
+        if (Array.isArray(sData)) {
+          setClassroomStudents(sData);
+          // Initialize attendance grid
+          const grid: Record<number, any> = {};
+          sData.forEach(s => {
+            grid[s.id] = 'present';
+          });
+          setAttendanceGrid(grid);
+        }
+      });
 
       // Fetch specific subtab details
       fetchClasstabData(cid);
