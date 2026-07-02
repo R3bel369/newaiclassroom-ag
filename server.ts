@@ -964,7 +964,7 @@ export default app;
   });
 
   // Get a specific meeting and classroom info for link-based joining
-  app.get("/api/meetings/:meetingId", requireAuth, async (req: AuthRequest, res) => {
+  app.get("/api/meetings/:meetingId", async (req: AuthRequest, res) => {
     try {
       const mid = parseInt(req.params.meetingId);
       const mtRows = await db.select().from(meetings).where(eq(meetings.id, mid)).limit(1);

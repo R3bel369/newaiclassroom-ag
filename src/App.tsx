@@ -62,6 +62,7 @@ export default function App() {
     return '';
   });
   const [currentUser, setCurrentUser] = useState<UserProfile | null>(null);
+  const [isGuestParticipant, setIsGuestParticipant] = useState(false);
   
   // Custom Login page variables and handlers
   const [loginEmail, setLoginEmail] = useState('');
@@ -632,7 +633,6 @@ export default function App() {
         }, 150);
       }
     };
-
     window.addEventListener('keydown', handleKeyDown);
     return () => {
       window.removeEventListener('keydown', handleKeyDown);
@@ -646,7 +646,7 @@ export default function App() {
       const mId = params.get('meetingId') || params.get('joinMeeting');
       if (mId) {
         try {
-          const headers = { 'x-demo-user-role': activeRole };
+          const headers = activeRole ? { 'x-demo-user-role': activeRole } : {};
           const res = await fetch(`/api/meetings/${mId}`, { headers });
           if (res.ok) {
             const data = await res.json();
@@ -654,6 +654,10 @@ export default function App() {
               setSelectedClass(data.classroom);
               setSelectedMeeting(data.meeting);
               if (data.students) setClassroomStudents(data.students);
+              
+              if (!isLoggedIn) {
+                setIsGuestParticipant(true);
+              }
               triggerAlert(`Entering live class stage: "${data.meeting.title}"`, 'ok');
               
               // Clear query params to make URL clean
@@ -670,10 +674,8 @@ export default function App() {
       }
     };
 
-    if (currentUser) {
-      handleMeetingQueryJoin();
-    }
-  }, [currentUser, activeRole]);
+    handleMeetingQueryJoin();
+  }, [currentUser, activeRole, isLoggedIn]);
 
   // Handle flash feedback
   const triggerAlert = (text: string, type: 'ok' | 'err' = 'ok') => {
@@ -2005,7 +2007,7 @@ export default function App() {
         )}
       </AnimatePresence>
 
-      {!isLoggedIn ? (
+      {!isLoggedIn && !isGuestParticipant ? (
         <div className="flex-1 flex flex-col items-center justify-center p-6 bg-slate-50 dark:bg-slate-950">
           <div className="max-w-md w-full">
             {/* Elegant Header / Logo Icon */}
@@ -2154,16 +2156,20 @@ export default function App() {
       ) : (
         <>
           {/* Embedded Meeting Room Screen overlay */}
-          {selectedMeeting && currentUser && (
+          {selectedMeeting && (currentUser || isGuestParticipant) && (
             <MeetingRoom 
               meeting={selectedMeeting}
-              currentUser={currentUser}
-              onLeave={() => setSelectedMeeting(null)}
+              currentUser={currentUser || { id: 9999, uid: 'guest', email: 'guest@classroom.com', name: 'Guest Participant', role: 'student', status: 'active' } as any}
+              onLeave={() => {
+                setSelectedMeeting(null);
+                if (isGuestParticipant) {
+                  setIsGuestParticipant(false);
+                  window.history.replaceState({}, document.title, window.location.pathname);
+                }
+              }}
               classroomStudents={classroomStudents}
             />
           )}
-
-
 
       {/* Primary Navigation Header */}
       <header className="h-16 bg-white border-b border-slate-200/90 shadow-xs flex items-center justify-between px-6 sticky top-0 z-35">
