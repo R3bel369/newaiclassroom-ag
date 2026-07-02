@@ -27,6 +27,8 @@ const PORT = process.env.PORT || 3000;
 
 (async () => {
   // Run database test on startup and log to file
+  if (process.env.VERCEL === "1") return; // Skip filesystem writes on Vercel
+
   try {
     console.log("Running startup database test query...");
     const testResult = await db.select().from(users).limit(1);
