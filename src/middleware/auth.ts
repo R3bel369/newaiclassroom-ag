@@ -12,6 +12,9 @@ export interface AuthRequest extends Request {
   dbUser?: any;   // Database model user
 }
 
+// Module-level cache for Supabase token verification to prevent slow network requests
+const tokenCache = new Map<string, { user: any, expiresAt: number }>();
+
 export const requireAuth = async (
   req: AuthRequest,
   res: Response,
@@ -34,12 +37,29 @@ export const requireAuth = async (
 
   const token = authHeader.split('Bearer ')[1];
   try {
-    // Verify Supabase Token using the Supabase Client (handles ES256/JWKS automatically)
-    const { data: { user }, error } = await supabase.auth.getUser(token);
+    let user;
+    const now = Date.now();
+    const cached = tokenCache.get(token);
     
-    if (error || !user) {
-      console.error('Supabase token verification error:', error);
-      return res.status(401).json({ error: 'Unauthorized: Invalid token' });
+    if (cached && cached.expiresAt > now) {
+      user = cached.user;
+    } else {
+      // Verify Supabase Token using the Supabase Client (handles ES256/JWKS automatically)
+      const { data, error } = await supabase.auth.getUser(token);
+      
+      if (error || !data.user) {
+        console.error('Supabase token verification error:', error);
+        return res.status(401).json({ error: 'Unauthorized: Invalid token' });
+      }
+      
+      user = data.user;
+      // Cache for 5 minutes
+      tokenCache.set(token, { user, expiresAt: now + 5 * 60 * 1000 });
+      
+      // Basic cleanup of old tokens
+      if (tokenCache.size > 1000) {
+        tokenCache.clear();
+      }
     }
 
     req.user = user;
