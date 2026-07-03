@@ -12,14 +12,15 @@ export interface AuthRequest extends Request {
   dbUser?: any;   // Database model user
 }
 
-// Module-level cache for Supabase token verification to prevent slow network requests
-const tokenCache = new Map<string, { user: any, expiresAt: number }>();
+import jwt from 'jsonwebtoken';
 
 export const requireAuth = async (
   req: AuthRequest,
   res: Response,
   next: NextFunction
 ) => {
+  // We still initialize Supabase just in case other parts of the app need the client,
+  // but we won't use it for the slow getUser() network call anymore.
   if (!supabase) {
     const url = process.env.VITE_SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
     const key = process.env.VITE_SUPABASE_ANON_KEY || process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
@@ -38,28 +39,35 @@ export const requireAuth = async (
   const token = authHeader.split('Bearer ')[1];
   try {
     let user;
-    const now = Date.now();
-    const cached = tokenCache.get(token);
+    const jwtSecret = process.env.SUPABASE_JWT_SECRET;
     
-    if (cached && cached.expiresAt > now) {
-      user = cached.user;
+    // OPTIMIZATION: Local JWT Verification for Serverless (Vercel)
+    // By verifying the token locally using the JWT Secret, we eliminate a 200-500ms 
+    // network request to the Supabase Auth server on EVERY SINGLE API call.
+    if (jwtSecret) {
+      try {
+        const decoded = jwt.verify(token, jwtSecret) as any;
+        user = {
+          id: decoded.sub,
+          email: decoded.email,
+          user_metadata: {
+            full_name: decoded.user_metadata?.full_name || decoded.name,
+            name: decoded.user_metadata?.name || decoded.name
+          }
+        };
+      } catch (jwtErr) {
+        console.error('Local JWT verification failed:', jwtErr);
+        return res.status(401).json({ error: 'Unauthorized: Invalid token' });
+      }
     } else {
-      // Verify Supabase Token using the Supabase Client (handles ES256/JWKS automatically)
+      // Fallback to slow network verification if secret is missing
       const { data, error } = await supabase.auth.getUser(token);
       
       if (error || !data.user) {
         console.error('Supabase token verification error:', error);
         return res.status(401).json({ error: 'Unauthorized: Invalid token' });
       }
-      
       user = data.user;
-      // Cache for 5 minutes
-      tokenCache.set(token, { user, expiresAt: now + 5 * 60 * 1000 });
-      
-      // Basic cleanup of old tokens
-      if (tokenCache.size > 1000) {
-        tokenCache.clear();
-      }
     }
 
     req.user = user;
