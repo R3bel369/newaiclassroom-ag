@@ -707,20 +707,22 @@ export default function App() {
         return res.json();
       };
 
-      // Sync all lists concurrently
-      const [uData, cData, nData, sData] = await Promise.all([
-        fetchJson('/api/users').catch(() => []),
-        fetchJson('/api/classes').catch(() => []),
-        fetchJson('/api/notifications').catch(() => []),
-        fetchJson('/api/analytics/institution').catch(() => ({}))
-      ]);
+      // OPTIMIZATION: Sync lists independently to prevent the UI from blocking on the slowest request
+      fetchJson('/api/users').then(data => {
+        if (Array.isArray(data)) setUserList(data);
+      }).catch(() => {});
 
-      startTransition(() => {
-        if (Array.isArray(uData)) setUserList(uData);
-        if (Array.isArray(cData)) setClassList(cData);
-        if (Array.isArray(nData)) setNotificationList(nData);
-        setInstStats(sData);
-      });
+      fetchJson('/api/classes').then(data => {
+        if (Array.isArray(data)) setClassList(data);
+      }).catch(() => {});
+
+      fetchJson('/api/notifications').then(data => {
+        if (Array.isArray(data)) setNotificationList(data);
+      }).catch(() => {});
+
+      fetchJson('/api/analytics/institution').then(data => {
+        setInstStats(data || {});
+      }).catch(() => {});
 
       if (selectedClass) {
         // Reload classroom details
@@ -736,6 +738,13 @@ export default function App() {
     try {
       setCurrentFolderPath([]);
       setMaterialsSearchQuery("");
+      
+      // OPTIMIZATION: Instantly show the class UI before network requests finish
+      const localClass = classList.find(c => c.id === cid);
+      if (localClass) {
+        setSelectedClass(localClass);
+      }
+      
       const headers = { 'x-demo-user-role': activeRole };
 
       const fetchJson = async (url: string) => {
@@ -787,23 +796,32 @@ export default function App() {
         return res.json();
       };
 
-      const [mData, aData, mtData, attData, subData, statsData] = await Promise.all([
-        fetchJson(`/api/classes/${cid}/materials`).catch(() => []),
-        fetchJson(`/api/classes/${cid}/assignments`).catch(() => []),
-        fetchJson(`/api/classes/${cid}/meetings`).catch(() => []),
-        fetchJson(`/api/classes/${cid}/attendance`).catch(() => []),
-        fetchJson(`/api/classes/${cid}/student-submissions`).catch(() => []),
-        fetchJson(`/api/classes/${cid}/analytics`).catch(() => ({}))
-      ]);
+      // OPTIMIZATION: Fetch secondary data independently so they populate as soon as they are ready
+      // instead of waiting for the slowest API call to finish.
+      fetchJson(`/api/classes/${cid}/materials`).then(data => {
+        if (Array.isArray(data)) setActiveClassMaterials(data);
+      }).catch(() => {});
 
-      startTransition(() => {
-        if (Array.isArray(mData)) setActiveClassMaterials(mData);
-        if (Array.isArray(aData)) setActiveClassAssignments(aData);
-        if (Array.isArray(mtData)) setActiveClassMeetings(mtData);
-        if (Array.isArray(attData)) setActiveClassAttendance(attData);
-        if (Array.isArray(subData)) setActiveClassSubmissions(subData);
-        setActiveClassAnalytics(statsData);
-      });
+      fetchJson(`/api/classes/${cid}/assignments`).then(data => {
+        if (Array.isArray(data)) setActiveClassAssignments(data);
+      }).catch(() => {});
+
+      fetchJson(`/api/classes/${cid}/meetings`).then(data => {
+        if (Array.isArray(data)) setActiveClassMeetings(data);
+      }).catch(() => {});
+
+      fetchJson(`/api/classes/${cid}/attendance`).then(data => {
+        if (Array.isArray(data)) setActiveClassAttendance(data);
+      }).catch(() => {});
+
+      fetchJson(`/api/classes/${cid}/student-submissions`).then(data => {
+        if (Array.isArray(data)) setActiveClassSubmissions(data);
+      }).catch(() => {});
+
+      fetchJson(`/api/classes/${cid}/analytics`).then(data => {
+        setActiveClassAnalytics(data || {});
+      }).catch(() => {});
+
     } catch (err) {
       console.error("Failed to load Tab info", err);
     }
