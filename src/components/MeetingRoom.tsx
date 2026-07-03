@@ -12,7 +12,7 @@ interface MeetingRoomProps {
 
 export default function MeetingRoom({ meeting, currentUser, onLeave, classroomStudents = [] }: MeetingRoomProps) {
   const [iframeLoaded, setIframeLoaded] = useState(false);
-  const [miroTalkType, setMiroTalkType] = useState<'sfu' | 'p2p'>('sfu');
+  const [miroTalkType, setMiroTalkType] = useState<'sfu' | 'p2p'>('p2p');
   const [copiedLink, setCopiedLink] = useState(false);
   const [iframeLoadCount, setIframeLoadCount] = useState(0);
 
