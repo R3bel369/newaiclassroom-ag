@@ -1,5 +1,6 @@
 // src/App.tsx
 import React, { useState, useEffect, startTransition } from 'react';
+import PomodoroWidget from './components/PomodoroWidget';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
   BookOpen, Users, FolderOpen, Calendar, GraduationCap, Folder, FolderPlus, Home, 
@@ -6360,6 +6361,9 @@ export default function App() {
       </AnimatePresence>
         </>
       )}
+
+      {/* Global Modules */}
+      {isLoggedIn && <PomodoroWidget />}
     </div>
   );
 }
