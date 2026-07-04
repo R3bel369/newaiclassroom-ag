@@ -2,13 +2,16 @@
 import { GoogleGenAI, Type } from "@google/genai";
 
 let aiInstance: GoogleGenAI | null = null;
+let currentKey: string | null = null;
 
-export function getGeminiClient(): GoogleGenAI {
-  if (!aiInstance) {
-    const apiKey = process.env.GEMINI_API_KEY;
-    if (!apiKey) {
-      throw new Error("GEMINI_API_KEY environment variable is required");
-    }
+export function getGeminiClient(apiKeyOverride?: string): GoogleGenAI {
+  const apiKey = apiKeyOverride || process.env.GEMINI_API_KEY;
+  if (!apiKey) {
+    throw new Error("GEMINI_API_KEY environment variable is required");
+  }
+  
+  if (!aiInstance || currentKey !== apiKey) {
+    currentKey = apiKey;
     aiInstance = new GoogleGenAI({
       apiKey,
       httpOptions: {
@@ -25,13 +28,14 @@ export function getGeminiClient(): GoogleGenAI {
 async function generateContentWithFallback(params: {
   contents: any;
   config?: any;
+  apiKeyOverride?: string;
 }) {
-  const apiKey = process.env.GEMINI_API_KEY;
+  const apiKey = params.apiKeyOverride || process.env.GEMINI_API_KEY;
   if (!apiKey) {
     throw new Error("Bypassed: No GEMINI_API_KEY configured in environment settings.");
   }
 
-  const ai = getGeminiClient();
+  const ai = getGeminiClient(params.apiKeyOverride);
   const modelsToTry = [
     "gemini-2.5-flash",
     "gemini-2.5-pro",
@@ -108,7 +112,7 @@ async function generateContentWithFallback(params: {
 }
 
 // AI Helper: Assignment Generator
-export async function generateAssignmentAI(assignmentType: string, topic: string, referenceUrl?: string) {
+export async function generateAssignmentAI(assignmentType: string, topic: string, referenceUrl?: string, apiKeyOverride?: string) {
   try {
     const prompt = `Generate a high-quality educational assignment of type: "${assignmentType}".
   The primary topic is: "${topic}".
@@ -122,6 +126,7 @@ Ensure the final response is strictly JSON matching this structure. Use standard
 
     const response = await generateContentWithFallback({
       contents: prompt,
+      apiKeyOverride,
       config: {
         responseMimeType: "application/json",
         responseSchema: {

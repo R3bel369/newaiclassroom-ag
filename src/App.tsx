@@ -41,7 +41,9 @@ const customFetch = async (input: RequestInfo | URL, init?: RequestInit): Promis
 const fetch = customFetch;
 
 // Primary client-side application container
+// Primary client-side application container
 export default function App() {
+  const [adminGeminiKey, setAdminGeminiKey] = useState(() => localStorage.getItem('adminGeminiApiKey') || '');
   // Navigation & User Context States
   const [isLoggedIn, setIsLoggedIn] = useState<boolean>(() => {
     if (typeof window !== 'undefined') {
@@ -1724,7 +1726,7 @@ export default function App() {
           "Content-Type": "application/json",
           "x-demo-user-role": activeRole
         },
-        body: JSON.stringify({ type: aiPrompts.type, topic: aiPrompts.topic, attachmentUrl: aiPrompts.attachmentUrl })
+        body: JSON.stringify({ type: aiPrompts.type, topic: aiPrompts.topic, attachmentUrl: aiPrompts.attachmentUrl, apiKey: adminGeminiKey })
       });
       const data = await res.json();
       if (data.success) {
@@ -2578,6 +2580,30 @@ export default function App() {
                           </div>
                         </div>
                       ))}
+                    </div>
+
+                    {/* AI Settings Section */}
+                    <div className="mt-8 bg-white border border-slate-200 rounded-xl p-5 shadow-sm text-left">
+                      <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wider mb-2">AI Configuration</h3>
+                      <p className="text-xs text-slate-500 mb-4">Set a custom Google Gemini API Key for use in the Assignment Generator.</p>
+                      <div className="flex space-x-2">
+                        <input 
+                          type="password" 
+                          value={adminGeminiKey} 
+                          onChange={(e) => setAdminGeminiKey(e.target.value)} 
+                          placeholder="AIzaSy..." 
+                          className="flex-1 text-sm bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 outline-none focus:ring-2 focus:ring-indigo-500"
+                        />
+                        <button 
+                          onClick={() => {
+                            localStorage.setItem('adminGeminiApiKey', adminGeminiKey);
+                            triggerAlert('API Key securely saved to local storage!');
+                          }}
+                          className="px-4 py-2 bg-indigo-600 text-white text-sm font-bold rounded-lg shadow hover:bg-indigo-700 transition"
+                        >
+                          Save Key
+                        </button>
+                      </div>
                     </div>
                   </>
                 ) : (

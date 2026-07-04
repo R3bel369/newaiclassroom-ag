@@ -810,12 +810,12 @@ export default app;
   // Trigger Gemini AI Assignment Generator
   app.post("/api/classes/:id/assignments/generate", requireAuth, async (req: AuthRequest, res) => {
     try {
-      const { type, topic, attachmentUrl } = req.body;
+      const { type, topic, attachmentUrl, apiKey } = req.body;
       if (!type || !topic) {
         return res.status(400).json({ error: "Assignment type and topic are required." });
       }
 
-      const generated = await generateAssignmentAI(type, topic, attachmentUrl);
+      const generated = await generateAssignmentAI(type, topic, attachmentUrl, apiKey);
       res.json({ success: true, assignment: generated });
     } catch (err: any) {
       res.status(500).json({ error: err.message });
