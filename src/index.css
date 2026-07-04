@@ -84,7 +84,7 @@ input:focus, select:focus, textarea:focus {
   border-color: #334155 !important;
 }
 .dark input:focus, .dark select:focus, .dark textarea:focus {
-  @apply ring-2 ring-indigo-500/40 border-indigo-400 !important;
+  @apply !ring-2 !ring-indigo-500/40 !border-indigo-400;
 }
 
 /* === Glassmorphism & Depth Enhancements === */
