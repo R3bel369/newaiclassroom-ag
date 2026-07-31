@@ -4,6 +4,7 @@ import express from "express";
 import path from "path";
 import fs from "fs";
 import { createServer as createViteServer } from "vite";
+import { AccessToken } from "livekit-server-sdk";
 import { db } from "./src/db/index.js";
 import { 
   users, 
@@ -58,6 +59,36 @@ export default app;
     } catch (err: any) {
       console.error("Test DB error:", err);
       res.status(500).json({ status: "error", message: err.message, stack: err.stack, cause: err.cause });
+    }
+  });
+
+  // API Route: LiveKit Token Generation
+  app.get("/api/livekit/token", async (req, res) => {
+    try {
+      const room = req.query.room as string;
+      const participantName = (req.query.participantName as string) || 'Guest Participant';
+      const participantId = (req.query.participantId as string) || `guest-${Math.floor(Math.random() * 10000)}`;
+      const participantRole = (req.query.participantRole as string) || 'student';
+
+      if (!room) {
+        return res.status(400).json({ error: "Missing 'room' query parameter" });
+      }
+
+      const apiKey = process.env.LIVEKIT_API_KEY || 'devkey';
+      const apiSecret = process.env.LIVEKIT_API_SECRET || 'secret';
+
+      const at = new AccessToken(apiKey, apiSecret, {
+        identity: participantId,
+        name: participantName,
+        metadata: JSON.stringify({ role: participantRole }),
+      });
+
+      at.addGrant({ roomJoin: true, room, canPublish: true, canSubscribe: true });
+
+      const token = await at.toJwt();
+      res.json({ token });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
     }
   });
 
