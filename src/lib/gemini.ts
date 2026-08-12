@@ -2,9 +2,9 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import { createRequire } from "module";
 
-const require = createRequire(import.meta.url);
-const pdfParse = require("pdf-parse");
-const mammoth = require("mammoth");
+const _req = typeof require !== "undefined" ? require : createRequire(import.meta.url);
+const pdfParse = _req("pdf-parse");
+const mammoth = _req("mammoth");
 
 async function downloadAndParseFile(url: string): Promise<string> {
   try {
