@@ -21,6 +21,12 @@ import {
 import { eq, and, or, inArray, desc, like, sql } from "drizzle-orm";
 import { requireAuth, AuthRequest } from "./src/middleware/auth.js";
 import { generateAssignmentAI, gradeSubmissionAI, generateAnalyticsReportAI, generateStudyFlashcardsAI } from "./src/lib/gemini.js";
+import { createClient } from "@supabase/supabase-js";
+
+// Initialize Supabase Storage Client
+const supabaseUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || "";
+const supabaseKey = process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_PUBLISHABLE_KEY || "";
+const supabase = createClient(supabaseUrl, supabaseKey);
 
 export const app = express();
 export default app;
@@ -101,16 +107,7 @@ export default app;
     }
   });
 
-  // Ensure uploads directory exists
-  const uploadsDir = path.join(process.cwd(), "uploads");
-  if (!fs.existsSync(uploadsDir)) {
-    fs.mkdirSync(uploadsDir, { recursive: true });
-  }
-
-  // Serve uploads directory statically so they can be viewed/downloaded
-  app.use("/uploads", express.static(uploadsDir));
-
-  // Upload endpoint
+  // Upload endpoint (Using Supabase Storage)
   app.post("/api/upload", requireAuth, async (req: AuthRequest, res) => {
     try {
       const { filename, base64Data } = req.body;
@@ -121,18 +118,34 @@ export default app;
       // Remove prefix if any (e.g., "data:application/pdf;base64,")
       const matches = base64Data.match(/^data:(.+);base64,(.+)$/);
       let dataString = base64Data;
+      let contentType = "application/octet-stream";
       if (matches && matches.length === 3) {
+        contentType = matches[1];
         dataString = matches[2];
       }
 
       const buffer = Buffer.from(dataString, "base64");
       const cleanFilename = Date.now() + "_" + filename.replace(/[^a-zA-Z0-9.\-_]/g, "_");
-      const filePath = path.join(uploadsDir, cleanFilename);
       
-      fs.writeFileSync(filePath, buffer);
+      // Upload to Supabase 'uploads' bucket
+      const { data, error } = await supabase.storage
+        .from("uploads")
+        .upload(cleanFilename, buffer, {
+          contentType: contentType,
+          upsert: true
+        });
+
+      if (error) {
+        throw error;
+      }
+
+      // Get public URL
+      const { data: publicUrlData } = supabase.storage
+        .from("uploads")
+        .getPublicUrl(cleanFilename);
 
       res.json({
-        url: `/uploads/${cleanFilename}`,
+        url: publicUrlData.publicUrl,
         filename: cleanFilename,
         originalName: filename,
       });
