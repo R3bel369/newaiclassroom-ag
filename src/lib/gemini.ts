@@ -1,5 +1,35 @@
 // src/lib/gemini.ts
 import { GoogleGenAI, Type } from "@google/genai";
+import { createRequire } from "module";
+
+const require = createRequire(import.meta.url);
+const pdfParse = require("pdf-parse");
+const mammoth = require("mammoth");
+
+async function downloadAndParseFile(url: string): Promise<string> {
+  try {
+    const res = await fetch(url);
+    if (!res.ok) throw new Error(`Failed to fetch file: ${res.statusText}`);
+    
+    const arrayBuffer = await res.arrayBuffer();
+    const buffer = Buffer.from(arrayBuffer);
+    
+    const lowerUrl = url.toLowerCase();
+    
+    if (lowerUrl.includes(".pdf")) {
+      const pdfData = await pdfParse(buffer);
+      return pdfData.text;
+    } else if (lowerUrl.includes(".doc") || lowerUrl.includes(".docx")) {
+      const docxData = await mammoth.extractRawText({ buffer });
+      return docxData.value;
+    } else {
+      return buffer.toString("utf8"); // Fallback to plain text
+    }
+  } catch (error) {
+    console.error("Error parsing document:", error);
+    return "";
+  }
+}
 
 let aiInstance: GoogleGenAI | null = null;
 let currentKey: string | null = null;
@@ -114,9 +144,14 @@ async function generateContentWithFallback(params: {
 // AI Helper: Assignment Generator
 export async function generateAssignmentAI(assignmentType: string, topic: string, referenceUrl?: string, apiKeyOverride?: string) {
   try {
+    let extractedText = "";
+    if (referenceUrl) {
+      extractedText = await downloadAndParseFile(referenceUrl);
+    }
+
     const prompt = `Generate a high-quality educational assignment of type: "${assignmentType}".
   The primary topic is: "${topic}".
-  ${referenceUrl ? `\nCRITICAL CONTEXT: The user has provided a reference document located at this URL: ${referenceUrl}\nIf you have browsing capabilities, or can extract context from the URL text itself, please base the assignment heavily on the contents of that document.` : ''}
+  ${extractedText ? `\nCRITICAL CONTEXT: The user uploaded a reference document. BASE YOUR ENTIRE ASSIGNMENT HEAVILY ON THIS EXTRACTED TEXT:\n\n"""\n${extractedText.substring(0, 50000)}\n"""\n\nEnsure the questions directly reflect the content provided above.` : ''}
 
   Please provide the output strictly as a JSON object matching this schema including:
 1. "title": A suitable title.
